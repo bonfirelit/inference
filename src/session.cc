@@ -1,0 +1,165 @@
+#include "common.h"
+#include "session.h"
+// #include <opencv2/core.hpp>
+// #include <opencv2/imgcodecs.hpp>
+// #include <opencv2/imgproc.hpp>
+
+// 单后端
+Session::Session(BackendType type, int num_executor, const std::string& model_path,
+const std::string& image_path) {
+    monitor_ = Monitor::getInstance();
+
+    backend_ = monitor_->getBackend(type);
+    assert(backend_ != nullptr);
+    tq_ = std::make_unique<TaskQueue>();
+    image_path_ = image_path;
+
+    num_executor_ = num_executor;
+    executors_.reserve(num_executor);
+    for (int i = 0; i < num_executor; i++) {
+        executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get()));
+    }
+}
+
+//多后端
+/** 
+Session::Session(std::vector<BackendType>& types, int num_executor, const std::string& path,
+const std::string& image_path) {
+    monitor_ = Monitor::getInstance();
+    tq_ = std::make_unique<TaskQueue>();
+
+    for (auto type : types) {
+        backedn1, backend2 = monitor_->getBackend(type);
+        bacends_.push_back(backend1, backend2);
+    }
+    
+    // 分配executor到不同的后端
+    executors_.reserve(num_executor);
+    for (int i = 0; i < n1; i++) {
+        executors_.emplace_back(std::make_unique<Executor>(path, backend_1, tq_));
+    }
+    for (int i = 0; i < n2; i++) {
+        executors_.emplace_back(std::make_unique<Executor>(path, backend_2, tq_));
+    }
+}
+*/
+
+
+/*
+std::vector<uint8_t> helper(const std::string& image_path) {
+    // generate task. resnet50 input preprocess
+    cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
+    assert(!image.empty());
+    cv::Mat resized_image;
+    // cv::resize(image, resized, cv::Size(224,224), 0, 0, cv::INTER_LINEAR);
+    cv::resize(image, resized_image, cv::Size(256, 256));
+    // 裁剪中心区域 224x224，从 (16,16) 开始
+    cv::Rect roi(16, 16, 224, 224);
+    cv::Mat cropped_image = resized_image(roi);
+    // BGR -> RGB
+    cv::Mat rgb_image;
+    cv::cvtColor(cropped_image, rgb_image, cv::COLOR_BGR2RGB);
+    // 转为 float32
+    cv::Mat float_image;
+    rgb_image.convertTo(float_image, CV_32FC3);
+    // 按通道归一化： (val - mean) / std
+    std::vector<float> mean = {123.0f, 117.0f, 104.0f};
+    std::vector<float> std  = {57.0f,  57.0f,  58.0f};
+
+    std::vector<cv::Mat> channels(3);
+    cv::split(float_image, channels); // 分离 R, G, B 通道
+
+    for (int i = 0; i < 3; ++i) {
+        channels[i] = (channels[i] - mean[i]) / std[i];
+    }
+
+    cv::Mat normalized_image;
+    cv::merge(channels, normalized_image); // 仍为 HWC，float32
+
+    // 7. HWC -> CHW，展开成 1x3x224x224
+    std::vector<cv::Mat> chw_channels(3);
+    cv::split(normalized_image, chw_channels); // 每个通道是 224x224
+
+    // 创建 1 x (3x224x224) 的 float32 Mat
+    cv::Mat chw_tensor(1, 3 * 224 * 224, CV_32F);
+
+    for (int i = 0; i < 3; ++i) {
+        std::memcpy(
+            chw_tensor.ptr<float>() + i * 224 * 224,
+            chw_channels[i].ptr<float>(),
+            224 * 224 * sizeof(float)
+        );
+    }
+    
+    // 获取数据指针和总字节数
+    float* float_ptr = chw_tensor.ptr<float>();
+    size_t float_count = 3 * 224 * 224;
+    size_t byte_count = float_count * sizeof(float); // 每个 float 是 4 字节
+
+    // 构造 std::vector<uint8_t>，使用 reinterpret_cast
+    std::vector<uint8_t> tensor_bytes(
+        reinterpret_cast<uint8_t*>(float_ptr),
+        reinterpret_cast<uint8_t*>(float_ptr) + byte_count
+    );
+
+    return tensor_bytes;
+}
+
+*/
+
+std::vector<float> Session::Run() {
+
+    assert(monitor_ != nullptr);
+    assert(backend_ != nullptr);
+    std::vector<uint8_t> tensor_bytes;
+    if (preprocess_fn_) {
+        INFO_LOG("Session is preprocessing now");
+        tensor_bytes = preprocess_fn_();
+        INFO_LOG("Session preprocess down");
+    }
+
+    // auto tensor_bytes = helper(image_path_);
+    // Tensor tensor{tensor_bytes, std::vector<uint32_t>{1,3,224,224}, FLOAT32};
+    // Task task{std::vector<Tensor>{{tensor_bytes, std::vector<uint32_t>{1,3,224,224}, FLOAT32}}, 
+    //         [this](std::vector<Tensor>&& outputs) {
+    //             outputs_ = std::move(outputs);
+    //             // 每完成一个任务，计数器减一
+    //             if (task_counter_.fetch_sub(1) == 1) {
+    //                 tq_->shutdown();  // 所有任务都处理完了
+    //             }
+    //         }
+    //     };
+    INFO_LOG("Session Create Task now");
+    Task task{std::vector<Tensor>{{tensor_bytes, std::vector<uint32_t>{1,5}, FLOAT32}}, 
+            [this](std::vector<Tensor>&& outputs) {
+                outputs_ = std::move(outputs);
+                // 每完成一个任务，计数器减一
+                if (task_counter_.fetch_sub(1) == 1) {
+                    tq_->shutdown();  // 所有任务都处理完了
+                }
+            }
+        };
+    task_counter_.fetch_add(1);
+    tq_->push(task);
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_executor_);
+
+    for (int i = 0; i < num_executor_; i++) {
+        INFO_LOG("Session Create threads now");
+        threads.emplace_back([this, i]() {
+            auto res = executors_[i]->Execute();
+            if (res != SUCCESS) {
+                ERROR_LOG("Executor [%d] failed", i);
+            }
+        });
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    INFO_LOG("Session Run over, output size = %ld", outputs_.size());
+    // 返回结果（假设只有一个结果张量）
+    return outputs_[0].asVector<float>();
+    // 后处理？
+}
