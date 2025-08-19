@@ -1,8 +1,8 @@
 #include "common.h"
 #include "session.h"
-// #include <opencv2/core.hpp>
-// #include <opencv2/imgcodecs.hpp>
-// #include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 // 单后端
 Session::Session(BackendType type, int num_executor, const std::string& model_path,
@@ -118,17 +118,6 @@ std::vector<float> Session::Run() {
         INFO_LOG("Session preprocess down");
     }
 
-    // auto tensor_bytes = helper(image_path_);
-    // Tensor tensor{tensor_bytes, std::vector<uint32_t>{1,3,224,224}, FLOAT32};
-    // Task task{std::vector<Tensor>{{tensor_bytes, std::vector<uint32_t>{1,3,224,224}, FLOAT32}}, 
-    //         [this](std::vector<Tensor>&& outputs) {
-    //             outputs_ = std::move(outputs);
-    //             // 每完成一个任务，计数器减一
-    //             if (task_counter_.fetch_sub(1) == 1) {
-    //                 tq_->shutdown();  // 所有任务都处理完了
-    //             }
-    //         }
-    //     };
     INFO_LOG("Session Create Task now");
     Task task{std::vector<Tensor>{{tensor_bytes, std::vector<uint32_t>{1,5}, FLOAT32}}, 
             [this](std::vector<Tensor>&& outputs) {
@@ -146,7 +135,6 @@ std::vector<float> Session::Run() {
     threads.reserve(num_executor_);
 
     for (int i = 0; i < num_executor_; i++) {
-        INFO_LOG("Session Create threads now");
         threads.emplace_back([this, i]() {
             auto res = executors_[i]->Execute();
             if (res != SUCCESS) {
