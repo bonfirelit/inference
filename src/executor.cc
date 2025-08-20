@@ -85,7 +85,8 @@ Result Executor::PrepareInput(std::vector<Tensor>&& inputs) {
     auto temp = static_cast<char*>(dev_input_ptr_);
     for (auto& tensor : inputs) {
         auto size = tensor.size();
-        backend_->MemCopy(temp, tensor.data(), size, HOST2DEVICE);
+        backend_->MemCopy(temp, tensor.data(), size, HOST2HOST);
+        // backend_->MemCopy(temp, tensor.data(), size, HOST2DEVICE);
         temp += size;
     }
     return SUCCESS;
@@ -119,11 +120,17 @@ std::vector<Tensor> Executor::GetOutput() {
         Tensor& tensor = outputs.back();
         assert(tensor.size() == output_size);
         assert(tensor.data() != nullptr);
+        // auto err = backend_->MemCopy(
+        //     tensor.data(),
+        //     dev_out_ptr + i * output_size,
+        //     output_size,
+        //     DEVICE2HOST
+        // );
         auto err = backend_->MemCopy(
             tensor.data(),
             dev_out_ptr + i * output_size,
             output_size,
-            DEVICE2HOST
+            HOST2HOST
         );
         if (err != SUCCESS) {
             ERROR_LOG("Executor Getoutput fail");

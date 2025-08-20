@@ -1,0 +1,11 @@
+model_path: "dummy"
+num_executor: 1
+devices: ["dummy"]
+
+inputs:
+  - shape: [1,5]
+    dtype: float32
+
+outputs:
+  - shape: [1,5]
+    dtype: float32

@@ -29,6 +29,8 @@ Session::Session(const std::string& yaml_file) {
     for (auto d : scfg_.devices) {
         if (d == "lynxi") {
             backend_ = monitor_->getBackend(BACKEND_LYNXI);
+        } else if (d == "dummy") {
+            backend_ = monitor_->getBackend(BACKEND_DUMMY);
         } else {
             backend_ = nullptr;
         }
@@ -143,7 +145,13 @@ std::vector<float> Session::Run() {
     }
 
     INFO_LOG("Session Create Task now");
-    Task task{std::vector<Tensor>{{tensor_bytes, std::vector<uint32_t>{1,5}, FLOAT32}}, 
+    std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
+    INFO_LOG("The input shape is:");
+    for (auto x : in_shape) {
+        printf("%d ", x);
+    }
+    printf("\n");
+    Task task{std::vector<Tensor>{{tensor_bytes, in_shape, FLOAT32}}, 
             [this](std::vector<Tensor>&& outputs) {
                 outputs_ = std::move(outputs);
                 // 每完成一个任务，计数器减一
@@ -210,7 +218,8 @@ SessionCfg Session::loadConfig(const std::string& yaml_file) {
             if (item["dtype"]) {
                 tc.dtype = item["dtype"].as<std::string>();
             }
-            sc.inputs.push_back(tc);
+            sc.outputs.push_back(tc);
         }
     }
+    return sc;
 }

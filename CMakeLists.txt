@@ -4,6 +4,8 @@ project(InferenceProject LANGUAGES CXX)
 # 使用 C++14
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
+
 
 # 库文件目录
 link_directories(
@@ -15,7 +17,7 @@ link_directories(
 
 set(LIB_SRC
     src/executor.cc
-    src/lynxi.cc
+    # src/lynxi.cc
     src/monitor.cc
     src/session.cc
     src/dummy.cc
@@ -27,7 +29,7 @@ set(MAIN_SRC
 
 # 构建动态库
 add_library(inference SHARED ${LIB_SRC})
-target_link_libraries(inference PUBLIC pthread)
+target_link_libraries(inference PUBLIC pthread yaml-cpp)
 
 # 构建可执行文件
 add_executable(inference_app ${MAIN_SRC})
@@ -37,17 +39,17 @@ target_include_directories(inference
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
     ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
-    ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
+    ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include/yaml-cpp
 )
 
-链接第三方库到 inference
-target_link_libraries(inference
-    opencv_core
-    opencv_imgproc
-    opencv_imgcodecs
-    yaml-cpp
+# 链接第三方库到 inference
+# target_link_libraries(inference
+    # opencv_core
+    # opencv_imgproc
+    # opencv_imgcodecs
+    # yaml-cpp
     # LYNXICHIPSDKCLIENT
-)
+# )
 
 # 链接动态库到可执行程序
 target_link_libraries(inference_app inference)

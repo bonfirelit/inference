@@ -9,6 +9,13 @@
 using PreprocessFn = std::function<std::vector<uint8_t>()>;
 using PostprocessFn = std::function<void(const std::vector<Tensor>& outputs)>;
 
+struct TensorCfg {
+    std::string name = "null";
+    std::vector<uint32_t> shape;
+    std::string dtype = "float32";
+};
+
+
 struct SessionCfg {
     std::string model_path;
     int num_executor;
@@ -17,11 +24,6 @@ struct SessionCfg {
     std::vector<TensorCfg> outputs;
 };
 
-struct TensorCfg {
-    std::string name = "null";
-    std::vector<uint32_t> shape;
-    std::string dtype = "float32";
-};
 
 
 class Session {

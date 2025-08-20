@@ -66,6 +66,8 @@
         "complex": "cpp",
         "cstring": "cpp",
         "cfenv": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "list": "cpp",
+        "valarray": "cpp"
     }
 }
