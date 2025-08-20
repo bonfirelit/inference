@@ -18,7 +18,7 @@ int main() {
     // }
 
     std::cout << "---------------USE YAML NOW----------" << std::endl;
-    std::string yaml = "../config.yaml";
+    std::string yaml = "../dummy_config.yaml";
     Session s2(yaml);
     std::vector<float> input2{2.0, 2.0, 2.0, 2.0, 2.0};
     s2.RegisterPreprocess([&]() -> std::vector<uint8_t> {
