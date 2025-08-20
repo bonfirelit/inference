@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 link_directories(
     ${CMAKE_SOURCE_DIR}/3rd_party/opencv/lib
     ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/lib
+    # ${CMAKE_SOURCE_DIR}/3rd_party/yaml/lib/arm
+    ${CMAKE_SOURCE_DIR}/3rd_party/yaml/lib/x86
 )
 
 set(LIB_SRC
@@ -35,6 +37,7 @@ target_include_directories(inference
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
     ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
+    ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
 )
 
 链接第三方库到 inference
@@ -42,6 +45,7 @@ target_link_libraries(inference
     opencv_core
     opencv_imgproc
     opencv_imgcodecs
+    yaml-cpp
     # LYNXICHIPSDKCLIENT
 )
 

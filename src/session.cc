@@ -3,6 +3,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include <yaml.h>
 
 // 单后端
 Session::Session(BackendType type, int num_executor, const std::string& model_path,
@@ -18,6 +19,29 @@ const std::string& image_path) {
     executors_.reserve(num_executor);
     for (int i = 0; i < num_executor; i++) {
         executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get()));
+    }
+}
+
+Session::Session(const std::string& yaml_file) {
+    monitor_ = Monitor::getInstance();
+
+    scfg_ = loadConfig(yaml_file);
+    for (auto d : scfg_.devices) {
+        if (d == "lynxi") {
+            backend_ = monitor_->getBackend(BACKEND_LYNXI);
+        } else {
+            backend_ = nullptr;
+        }
+    }
+    assert(backend_ != nullptr);
+    tq_ = std::make_unique<TaskQueue>();
+    // image_path_ = ;
+
+    num_executor_ = scfg_.num_executor;
+    model_path_ = scfg_.model_path;
+    executors_.reserve(num_executor_);
+    for (int i = 0; i < num_executor_; i++) {
+        executors_.emplace_back(std::make_unique<Executor>(model_path_, backend_, tq_.get()));
     }
 }
 
@@ -150,4 +174,43 @@ std::vector<float> Session::Run() {
     // 返回结果（假设只有一个结果张量）
     return outputs_[0].asVector<float>();
     // 后处理？
+}
+
+SessionCfg Session::loadConfig(const std::string& yaml_file) {
+    YAML::Node config = YAML::LoadFile(yaml_file);
+    SessionCfg sc;
+
+    sc.model_path   = config["model_path"].as<std::string>();
+    sc.num_executor = config["num_executor"].as<int>();
+    for (auto d : config["devices"]) {
+        sc.devices.push_back(d.as<std::string>());
+    }
+
+    if (config["inputs"]) {
+        for (auto item : config["inputs"]) {
+            TensorCfg tc;
+            if (item["shape"]) {
+                for (auto dim : item["shape"])
+                    tc.shape.push_back(dim.as<uint32_t>());
+            }
+            if (item["dtype"]) {
+                tc.dtype = item["dtype"].as<std::string>();
+            }
+            sc.inputs.push_back(tc);
+        }
+    }
+
+    if (config["outputs"]) {
+        for (auto item : config["outputs"]) {
+            TensorCfg tc;
+            if (item["shape"]) {
+                for (auto dim : item["shape"])
+                    tc.shape.push_back(dim.as<uint32_t>());
+            }
+            if (item["dtype"]) {
+                tc.dtype = item["dtype"].as<std::string>();
+            }
+            sc.inputs.push_back(tc);
+        }
+    }
 }
