@@ -9,23 +9,24 @@
 
 class Executor {
   public:
-    Executor(const std::string& model_path, Backend* backend, TaskQueue* tq);
-    ~Executor() = default;
+    Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id);
+    ~Executor();
     Result Execute();
-    Result UnloadModel();
-
-  private:
+    
+    private:
+    int id_;
     Backend* backend_;
     std::string model_path_;
     TaskQueue* tq_;
     int model_id_{-1};
-
+    
     const ModelInfo* info_{nullptr};
-
+    
     void* dev_input_ptr_{nullptr};
     void* dev_output_ptr_{nullptr};
-
+    
     Result LoadModel();
+    Result UnloadModel();
     Result Init();
     Result Run();
     Result Finalize();

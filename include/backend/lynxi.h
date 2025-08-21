@@ -33,8 +33,8 @@ class Lynxi : public Backend {
 
     lynContext_t ctx_{};
 
-    std::mutex stream_lock_;
-    std::mutex model_lock_;
+    mutable std::mutex stream_lock_;
+    mutable std::mutex model_lock_;
 
     std::unordered_map<Executor*, lynStream_t> executor2stream_;
     std::unordered_map<std::string, int> path2id_;

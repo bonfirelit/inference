@@ -39,8 +39,12 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
         cond_.wait(lock, [this] { return stop_ || !queue_.empty(); });
 
-        if (stop_ && queue_.empty())
+        if (stop_ && queue_.empty()) {
+            if (stop_) {
+                INFO_LOG("Task Queue stopped! and the queue's size = %ld", queue_.size());
+            }
             return false;
+        }
 
         task_out = std::move(queue_.front());
         queue_.pop();

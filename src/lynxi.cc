@@ -173,30 +173,40 @@ Result Lynxi::UnloadModel(const std::string& path) {
 }
 
 Result Lynxi::Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_output_ptr) {
-    auto it_stream = executor2stream_.find(e);
-    auto it_model = models_.find(model_id);
-    auto it_info = infos_.find(model_id);
+    lynStream_t stream;
+    lynModel_t model;
+    size_t batch_size;
 
-    if (it_stream != executor2stream_.end() && 
-        it_model != models_.end() &&
-        it_info != infos_.end()) {
-
-        lynStream_t stream = it_stream->second;
-        lynModel_t model = it_model->second;
-        size_t batch_size = it_info->second->getBatchSize();
-
-        assert(stream != nullptr && model != nullptr && batch_size != 0);
-        lynExecuteModelAsync(stream, model, dev_input_ptr, dev_output_ptr, batch_size);
-        lynSynchronizeStream(stream);
-    } else {
-        ERROR_LOG("lynxi: executor对应的stream或model句柄不存在");
-        return FAIL;
+    {
+        std::lock_guard<std::mutex> lock(stream_lock_);
+        auto it = executor2stream_.find(e);
+        if (it == executor2stream_.end()) {
+            ERROR_LOG("executor对应stream不存在");
+            return FAIL;
+        }
+        stream = it->second;
     }
+
+    {
+        std::lock_guard<std::mutex> lock(model_lock_);
+        auto it_model = models_.find(model_id);
+        auto it_info  = infos_.find(model_id);
+        if (it_model == models_.end() || it_info == infos_.end()) {
+            ERROR_LOG("model或model_info不存在");
+            return FAIL;
+        }
+        model = it_model->second;
+        batch_size = it_info->second->getBatchSize();
+    }
+
+    lynExecuteModelAsync(stream, model, dev_input_ptr, dev_output_ptr, batch_size);
+    lynSynchronizeStream(stream);
     return SUCCESS;
 }
 
 // 如果涉及到executor的动态扩容，这些函数读取了map，也需要加锁
 const ModelInfo* Lynxi::GetModelInfo(int model_id) const {
+    std::lock_guard<std::mutex> lock(model_lock_);
     auto it = infos_.find(model_id);
     if (it == infos_.end()) {
         ERROR_LOG("ModelInfo不存在");

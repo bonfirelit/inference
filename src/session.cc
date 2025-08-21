@@ -18,7 +18,7 @@ const std::string& image_path) {
     num_executor_ = num_executor;
     executors_.reserve(num_executor);
     for (int i = 0; i < num_executor; i++) {
-        executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get()));
+        executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get(), i));
     }
 }
 
@@ -43,7 +43,7 @@ Session::Session(const std::string& yaml_file) {
     model_path_ = scfg_.model_path;
     executors_.reserve(num_executor_);
     for (int i = 0; i < num_executor_; i++) {
-        executors_.emplace_back(std::make_unique<Executor>(model_path_, backend_, tq_.get()));
+        executors_.emplace_back(std::make_unique<Executor>(model_path_, backend_, tq_.get(), i));
     }
 }
 

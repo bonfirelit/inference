@@ -25,5 +25,6 @@ class Dummy : public Backend {
 
   private:
     BackendType type_{BACKEND_DUMMY};
-    std::unique_ptr<ModelInfo> info_;
+    std::unique_ptr<ModelInfo> info_{nullptr};
+    mutable std::mutex model_lock_;
 };

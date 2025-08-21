@@ -2,28 +2,35 @@
 
 // 要保证调用构造函数时，backend_type一定是合法的
 // 入参的backend指针代表该执行器在这个后端上运行
-Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq) 
+Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id) 
     : backend_(backend)
     , model_path_(model_path)
-    , tq_(tq) {}
+    , tq_(tq)
+    , id_(id) {
+        INFO_LOG("executor[%d] created!", id_);
+    }
+
+Executor::~Executor() {
+    INFO_LOG("executor[%d] Destoried!", id_);
+}
 
 Result Executor::Execute() {
-    INFO_LOG("Executor Init");
+    INFO_LOG("Executor[%d] Init", id_);
     RETURN_IF_ERR(Init(), "Executor init fail");
-    INFO_LOG("Executor LoadModel");
+    INFO_LOG("Executor[%d] LoadModel", id_);
     RETURN_IF_ERR(LoadModel(), "Exeuctor load model fail");
     Task task{};
     while (tq_->pop(task)) {
         // 分配设备内存
-        INFO_LOG("Executor PrepareInput");
+        INFO_LOG("Executor[%d] PrepareInput", id_);
         RETURN_IF_ERR(PrepareInput(std::move(task.inputs)), "Executor failed to prepare input");
-        INFO_LOG("Executor PrepareOutput");
+        INFO_LOG("Executor[%d] PrepareOutput", id_);
         RETURN_IF_ERR(PrepareOutput(), "Executor fail to prepare output");
         // 执行
-        INFO_LOG("Executor Run");
+        INFO_LOG("Executor[%d] Run", id_);
         RETURN_IF_ERR(Run(), "Executor run fail");
         // 回调函数将结果传输至session
-        INFO_LOG("Executor GetOutput");
+        INFO_LOG("Executor[%d] GetOutput", id_);
         task.cb(GetOutput());
         // 释放设备内存
         DestroyBuffers();
