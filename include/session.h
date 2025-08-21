@@ -6,6 +6,12 @@
 #include "monitor.h"
 #include "task_queue.h"
 
+/*
+为什么是三重vector？
+第一维代表每个推理任务的输出，而每个推理任务的输出又是多个vector<float>
+*/
+using SessionOut = std::vector<std::vector<std::vector<float>>>;
+
 using PreprocessFn = std::function<std::vector<uint8_t>()>;
 using PostprocessFn = std::function<void(const std::vector<Tensor>& outputs)>;
 
@@ -19,6 +25,7 @@ struct TensorCfg {
 struct SessionCfg {
     std::string model_path;
     int num_executor;
+    int num_task;
     std::vector<std::string> devices;
     std::vector<TensorCfg> inputs;
     std::vector<TensorCfg> outputs;
@@ -34,7 +41,7 @@ class Session {
     Session(const std::string& yaml_file);
     ~Session() = default;
 
-    std::vector<float> Run();
+    SessionOut Run();
 
     void RegisterPreprocess(PreprocessFn fn) { preprocess_fn_ = std::move(fn); }
     void RegisterPostprocess(PostprocessFn fn) { postprocess_fn_ = std::move(fn); }
@@ -42,6 +49,7 @@ class Session {
   private:
     SessionCfg loadConfig(const std::string& yaml_file);
     int num_executor_;
+    int num_task_;
     
     Monitor* monitor_;
 
@@ -49,7 +57,7 @@ class Session {
     std::unique_ptr<TaskQueue> tq_;
     std::string model_path_;
     // std::vector<Backend*> backends_;
-    std::vector<Tensor> outputs_;
+    std::vector<std::vector<Tensor>> outputs_;
     std::atomic<int> task_counter_{0};
     SessionCfg scfg_;
     PreprocessFn preprocess_fn_;
