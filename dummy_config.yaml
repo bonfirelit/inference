@@ -1,5 +1,5 @@
 model_path: "dummy"
-num_executor: 4
+num_executor: 8
 devices: ["dummy"]
 
 inputs:
