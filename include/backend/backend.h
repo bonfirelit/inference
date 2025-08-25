@@ -5,6 +5,7 @@
 class Executor;
 class ModelInfo;
 
+// TODO:添加Stream抽象类，Event抽象类
 class Backend {
   public:
     virtual Result Init() = 0;

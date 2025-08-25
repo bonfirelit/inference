@@ -29,6 +29,8 @@ Result Monitor::Init() {
 }
 
 Backend* Monitor::getBackend(BackendType type) {
+    // 可以做成懒加载。在这里如果没有找到对应type的后端，可以尝试创建并返回
+    // 相应的，Monitor的初始化函数中就可以不用创建后端了。使用工厂模式加载
     if (backends_.find(type) == backends_.end()) {
         INFO_LOG("后端不存在");
         return nullptr;
