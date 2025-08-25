@@ -18,20 +18,20 @@ class Executor {
     Backend* backend_;
     std::string model_path_;
     TaskQueue* tq_;
-    int model_id_{-1};
+    uint32_t model_id_{0};
     
     const ModelInfo* info_{nullptr};
     
     void* dev_input_ptr_{nullptr};
     void* dev_output_ptr_{nullptr};
     
-    Result LoadModel();
-    Result UnloadModel();
-    Result Init();
-    Result Run();
-    Result Finalize();
-    Result PrepareInput(std::vector<Tensor>&&);
-    Result PrepareOutput();
-    void DestroyBuffers();
-    std::vector<Tensor> GetOutput();
+    Result loadModel();
+    Result unloadModel();
+    Result init();
+    Result run();
+    Result finalize();
+    Result prepareInput(std::vector<Tensor>&&);
+    Result prepareOutput();
+    void destroyBuffers();
+    std::vector<Tensor> getOutput();
 };

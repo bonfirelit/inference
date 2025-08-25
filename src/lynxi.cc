@@ -1,15 +1,14 @@
 #include "backend/lynxi.h"
 
-Lynxi::Lynxi(int dev_id) : device_id_(dev_id) {
-
-}
+Lynxi::Lynxi(int dev_id) : Backend(BACKEND_LYNXI, dev_id) {}
 
 Lynxi::~Lynxi() {
+    // ?????
     lynDestroyContext(ctx_);
 }
 
-// 初始化设备。对于灵汐是为设备创建ctx
-Result Lynxi::Init() {
+
+Result Lynxi::init() {
     if (ctx_ != nullptr) { // 该backend已经初始化过了
         return SUCCESS;
     }
@@ -21,8 +20,7 @@ Result Lynxi::Init() {
     return SUCCESS;
 }
 
-// 有用吗???????????????????
-Result Lynxi::Finalize() {
+Result Lynxi::finalize() {
     auto err = lynDestroyContext(ctx_);
     if (err != 0) {
         ERROR_LOG("lynxi销毁ctx失败");
@@ -31,7 +29,7 @@ Result Lynxi::Finalize() {
     return SUCCESS;
 }
 
-Result Lynxi::MemCopy(void *dst, const void *src, uint64_t size, DIRECTION dir) {
+Result Lynxi::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) {
     lynError_t err;
     if (dir == DEVICE2HOST) {
         err = lynMemcpy(dst, src, size, ServerToClient);
@@ -48,29 +46,33 @@ Result Lynxi::MemCopy(void *dst, const void *src, uint64_t size, DIRECTION dir) 
     return SUCCESS;
 }
 
-void Lynxi::Malloc(void **dev_ptr, uint64_t size) {
+Result Lynxi::malloc(void **dev_ptr, uint64_t size) {
     lynError_t err = lynMalloc(dev_ptr, size);
     if (err != 0) {
         ERROR_LOG("lynxi: 分配内存失败");
         dev_ptr = nullptr;
+        return FAIL;
     }
+    return SUCCESS;
 }
 
-void Lynxi::Free(void *dev_ptr) {
+Result Lynxi::free(void *dev_ptr) {
     lynError_t err = lynFree(dev_ptr);
     if (err != 0) {
         ERROR_LOG("lynxi: 释放内存失败");
+        return FAIL;
     }
+    return SUCCESS;
 }
 
 // 加载模型，同时创建modelinfo，返回model_id
-int Lynxi::LoadModel(const std::string &path) {
+uint32_t Lynxi::loadModel(const std::string &path) {
 
     // 判断模型是否已加载
     {
         std::lock_guard<std::mutex> lock(model_lock_);
-        auto it = path2id_.find(path);
-        if (it != path2id_.end()) {
+        auto it = path_to_id_.find(path);
+        if (it != path_to_id_.end()) {
             return it->second;
         }
     }
@@ -84,8 +86,8 @@ int Lynxi::LoadModel(const std::string &path) {
 
     {
         std::lock_guard<std::mutex> lock(model_lock_);
-        auto it = path2id_.find(path);
-        if (it != path2id_.end()) {
+        auto it = path_to_id_.find(path);
+        if (it != path_to_id_.end()) {
             lynUnloadModel(model);
             return it->second;
         }
@@ -129,8 +131,8 @@ int Lynxi::LoadModel(const std::string &path) {
             ins_dim.emplace_back(std::move(dim));
         }
 
-        path2id_[path] = model_id;
-        models_[model_id] = model;
+        path_to_id_[path] = model_id;
+        models_[model_id] = std::make_unique<LynxiModel>(this);
         infos_[model_id] = std::make_unique<ModelInfo>(
             batch_size,
             input_size,
@@ -145,22 +147,22 @@ int Lynxi::LoadModel(const std::string &path) {
     }
 }
 
-Result Lynxi::UnloadModel(const std::string& path) {
+Result Lynxi::unloadModel(const std::string& path) {
     lynModel_t model;
     {
         std::lock_guard<std::mutex> lock(model_lock_);
-        if (path2id_.find(path) == path2id_.end()) {
+        if (path_to_id_.find(path) == path_to_id_.end()) {
             return SUCCESS;
         }
-        int model_id = path2id_[path];
+        int model_id = path_to_id_[path];
         auto it = models_.find(model_id);
         if (it == models_.end()) {
             ERROR_LOG("未找到模型句柄,unload失败");
             return FAIL;
         }
-        model = it->second;
+        model = (lynModel_t)it->second->getHandle();
 
-        path2id_.erase(path);
+        path_to_id_.erase(path);
         models_.erase(model_id);
         infos_.erase(model_id);
     }
@@ -172,19 +174,19 @@ Result Lynxi::UnloadModel(const std::string& path) {
     return SUCCESS;
 }
 
-Result Lynxi::Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_output_ptr) {
+Result Lynxi::infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
     lynStream_t stream;
     lynModel_t model;
     size_t batch_size;
 
     {
         std::lock_guard<std::mutex> lock(stream_lock_);
-        auto it = executor2stream_.find(e);
-        if (it == executor2stream_.end()) {
+        auto it = exec_to_stream_.find(e);
+        if (it == exec_to_stream_.end()) {
             ERROR_LOG("executor对应stream不存在");
             return FAIL;
         }
-        stream = it->second;
+        stream = (lynStream_t)it->second->getStream();
     }
 
     {
@@ -195,7 +197,7 @@ Result Lynxi::Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_ou
             ERROR_LOG("model或model_info不存在");
             return FAIL;
         }
-        model = it_model->second;
+        model = (lynModel_t)it_model->second->getHandle();
         batch_size = it_info->second->getBatchSize();
     }
 
@@ -204,8 +206,7 @@ Result Lynxi::Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_ou
     return SUCCESS;
 }
 
-// 如果涉及到executor的动态扩容，这些函数读取了map，也需要加锁
-const ModelInfo* Lynxi::GetModelInfo(int model_id) const {
+const ModelInfo* Lynxi::getModelInfo(uint32_t model_id) const {
     std::lock_guard<std::mutex> lock(model_lock_);
     auto it = infos_.find(model_id);
     if (it == infos_.end()) {
@@ -215,45 +216,120 @@ const ModelInfo* Lynxi::GetModelInfo(int model_id) const {
     return it->second.get();
 }
 
-// 为执行器创建运行时资源。对于灵汐是创建Stream
-Result Lynxi::InitRtResource(Executor* e) {
+Result Lynxi::createStream(Executor* e) {
     auto err = lynSetCurrentContext(ctx_);
     if (err != 0) {
         ERROR_LOG("lynSetCurrentContext Fail");
         return FAIL;
     }
 
-    lynStream_t stream = nullptr;
-    err = lynCreateStream(&stream);
-    if (err != 0) {
-        ERROR_LOG("lynxi创建Stream失败");
-        return FAIL;
+    std::unique_ptr<LynxiStream> stream = std::make_unique<LynxiStream>(this);
+    Result res = stream->createStream();
+    if (res == FAIL) {
+        return res;
     }
 
     {
         std::lock_guard<std::mutex> lock(stream_lock_);    
-        executor2stream_[e] = stream;
+        exec_to_stream_[e] = std::move(stream);
     }
     return SUCCESS;
 }
 
-Result Lynxi::FinalizeRtResource(Executor* e) {
-    lynStream_t stream;
-    {
-        std::lock_guard<std::mutex> lock(stream_lock_);
-        auto it = executor2stream_.find(e);
-        if (it != executor2stream_.end()) {
-            stream = it->second;
-            executor2stream_.erase(it);
-        } else {
-            ERROR_LOG("stream不存在");
-            return FAIL;
-        }
+Result Lynxi::destoryStream(Executor* e) {
+    std::lock_guard<std::mutex> lock(stream_lock_);
+    auto it = exec_to_stream_.find(e);
+    Result res = SUCCESS;
+    if (it != exec_to_stream_.end()) {
+        res = it->second->destoryStream();
+        exec_to_stream_.erase(it);
+    } else {
+        ERROR_LOG("stream不存在");
+        return FAIL;
     }
-    auto err = lynDestroyStream(stream);
+    return res;
+}
+
+void* LynxiModel::getHandle() {
+    return model_;
+}
+
+Result LynxiStream::synchronize() {
+    auto err = lynSynchronizeStream(stream_);
     if (err != 0) {
-        ERROR_LOG("销毁stream失败");
+        ERROR_LOG("lynxi synchronize stream failed!");
         return FAIL;
     }
     return SUCCESS;
+}
+
+Result LynxiStream::createStream() {
+    auto err = lynCreateStream(&stream_);
+    if (err != 0) {
+        ERROR_LOG("lynxi create stream failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+Result LynxiStream::destoryStream() {
+    auto err = lynDestroyStream(stream_);
+    if (err != 0) {
+        ERROR_LOG("lynxi destory stream failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+Result LynxiStream::recordEvent(Event* event) {
+    auto err = lynRecordEvent(stream_, (lynEvent_t)event->getEvent());
+    if (err != 0) {
+        ERROR_LOG("lynxi record event failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+Result LynxiStream::waitEvent(Event* event) {
+    auto err = lynStreamWaitEvent(stream_, (lynEvent_t)event->getEvent());
+    if (err != 0) {
+        ERROR_LOG("lynxi wait event failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+void* LynxiStream::getStream() {
+    return stream_;
+}
+
+Result LynxiEvent::createEvent() {
+    auto err = lynCreateEvent(&event_);
+    if (err != 0) {
+        ERROR_LOG("lynxi create event failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+Result LynxiEvent::destoryEvent() {
+    auto err = lynDestroyEvent(event_);
+    if (err != 0) {
+        ERROR_LOG("lynxi destory event failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+Result LynxiEvent::synchronize() {
+    auto err = lynSynchronizeEvent(event_);
+    if (err != 0) {
+        ERROR_LOG("lynxi synchronize event failed!");
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+void* LynxiEvent::getEvent() {
+    return event_;
 }

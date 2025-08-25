@@ -43,8 +43,8 @@ class Session {
 
     SessionOut Run();
 
-    void RegisterPreprocess(PreprocessFn fn) { preprocess_fn_ = std::move(fn); }
-    void RegisterPostprocess(PostprocessFn fn) { postprocess_fn_ = std::move(fn); }
+    void registerPreprocess(PreprocessFn fn) { preprocess_fn_ = std::move(fn); }
+    void registerPostprocess(PostprocessFn fn) { postprocess_fn_ = std::move(fn); }
 
   private:
     SessionCfg loadConfig(const std::string& yaml_file);
@@ -56,7 +56,7 @@ class Session {
     std::vector<std::unique_ptr<Executor>> executors_;
     std::unique_ptr<TaskQueue> tq_;
     std::string model_path_;
-    // std::vector<Backend*> backends_;
+    std::vector<Backend*> backends_;
     std::vector<std::vector<Tensor>> outputs_;
     std::atomic<int> task_counter_{0};
     SessionCfg scfg_;

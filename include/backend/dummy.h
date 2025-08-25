@@ -8,23 +8,21 @@
 
 class Dummy : public Backend {
   public:
-    Dummy() = default;
-    ~Dummy() = default;
+    Dummy() : Backend(BACKEND_DUMMY, 114514) {}
+    virtual ~Dummy() {}
 
-    Result Init() override;
-    Result Finalize() override;
-    void Malloc(void **dev_ptr, uint64_t size) override;
-    void Free(void *dev_prt) override;
-    Result MemCopy(void *dst, const void *src, uint64_t size, DIRECTION dir) override;
-    int LoadModel(const std::string &path) override;
-    Result UnloadModel(const std::string& path) override;
-    Result Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_output_ptr) override;
-    Result InitRtResource(Executor* e) override;
-    const ModelInfo* GetModelInfo(int model_id) const override;
-    Result FinalizeRtResource(Executor*e ) override;
+    Result init() override;
+    Result finalize() override;
+    Result malloc(void **dev_ptr, uint64_t size) override;
+    Result free(void *dev_prt) override;
+    Result memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) override;
+    uint32_t loadModel(const std::string &path) override;
+    Result unloadModel(const std::string& path) override;
+    Result infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) override;
+    Result createStream(Executor* e) override;
+    const ModelInfo* getModelInfo(uint32_t model_id) const override;
+    Result destoryStream(Executor*e ) override;
 
   private:
-    BackendType type_{BACKEND_DUMMY};
     std::unique_ptr<ModelInfo> info_{nullptr};
-    mutable std::mutex model_lock_;
 };

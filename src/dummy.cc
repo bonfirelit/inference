@@ -1,29 +1,31 @@
 #include "backend/dummy.h"
 #include <cstring>
 
-Result Dummy::Init() {
+Result Dummy::init() {
     INFO_LOG("Dummy Init Success");
     return SUCCESS;
 }
 
-Result Dummy::Finalize() {
+Result Dummy::finalize() {
     INFO_LOG("Dummy Finalize Success");
     return SUCCESS;
 }
 
-void Dummy::Malloc(void **dev_ptr, uint64_t size) {
+Result Dummy::malloc(void **dev_ptr, uint64_t size) {
     INFO_LOG("--Dummy Malloc Start--");
-    *dev_ptr = malloc(size);
+    *dev_ptr = std::malloc(size);
     INFO_LOG("Dummy malloc %lu bytes at addr %p", size, *dev_ptr);
+    return SUCCESS;
 }
 
-void Dummy::Free(void *dev_ptr) {
-    INFO_LOG("--Dummy Free start--");
-    free(dev_ptr);
+Result Dummy::free(void *dev_ptr) {
+    INFO_LOG("--Dummy free start--");
+    std::free(dev_ptr);
     INFO_LOG("Dummy free mem at addr %p", dev_ptr);
+    return SUCCESS;
 }
 
-Result Dummy::MemCopy(void *dst, const void *src, uint64_t size, DIRECTION dir) {
+Result Dummy::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) {
     INFO_LOG("--Dummy Memcpy Start--");
     assert(dir == HOST2HOST);
     std::memcpy(dst, src, size);
@@ -31,9 +33,9 @@ Result Dummy::MemCopy(void *dst, const void *src, uint64_t size, DIRECTION dir) 
     return SUCCESS;
 }
 
-int Dummy::LoadModel(const std::string &path) {
-    INFO_LOG("--Dummy LoadModel Start--");
-    int id = 114514;
+uint32_t Dummy::loadModel(const std::string &path) {
+    INFO_LOG("--Dummy loadModel Start--");
+    uint32_t id = 114514;
     {
         std::lock_guard<std::mutex> lock(model_lock_);
         if (info_ != nullptr) {
@@ -55,19 +57,19 @@ int Dummy::LoadModel(const std::string &path) {
     return id;
 }
 
-Result Dummy::UnloadModel(const std::string& path) {
+Result Dummy::unloadModel(const std::string& path) {
     INFO_LOG("--Dummy UnloadModel Start--");
     INFO_LOG("Dummy unload model success");
     return SUCCESS;
 }
 
-Result Dummy::Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_output_ptr) {
+Result Dummy::infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
     // std::lock_guard<std::mutex> lock(model_lock_);
     // if (!info_) {
     //     ERROR_LOG("Dummy infer failed: no model loaded");
     //     return FAIL;
     // }
-    INFO_LOG("--Dummy Infer Start--");
+    INFO_LOG("--Dummy infer Start--");
     float* input = static_cast<float*>(dev_input_ptr);
     float* output = static_cast<float*>(dev_output_ptr);
     int len = 5;
@@ -79,21 +81,21 @@ Result Dummy::Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_ou
     return SUCCESS;
 }
 
-Result Dummy::InitRtResource(Executor* e) {
-    INFO_LOG("--Dummy InitRtResource Start--");
-    INFO_LOG("Dummy init rt resource success");
+Result Dummy::createStream(Executor* e) {
+    INFO_LOG("--Dummy createStream Start--");
+    INFO_LOG("Dummy createStream success");
     return SUCCESS;
 }
 
-const ModelInfo* Dummy::GetModelInfo(int model_id) const {
+const ModelInfo* Dummy::getModelInfo(uint32_t model_id) const {
     std::lock_guard<std::mutex> lock(model_lock_);
-    INFO_LOG("--Dummy GetModelInfo Start--");
+    INFO_LOG("--Dummy getModelInfo Start--");
     INFO_LOG("Dummy get %d model info", model_id);
     return info_.get();
 }
 
-Result Dummy::FinalizeRtResource(Executor*e ) {
-    INFO_LOG("--Dummy FinalizeRtResource Start--");
-    INFO_LOG("Dummy finalize rt resource success");
+Result Dummy::destoryStream(Executor*e ) {
+    INFO_LOG("--Dummy destoryStream Start--");
+    INFO_LOG("Dummy destoryStream success");
     return SUCCESS;
 }

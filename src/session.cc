@@ -1,8 +1,5 @@
 #include "common.h"
 #include "session.h"
-#include <opencv2/core.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
 #include <yaml.h>
 
 // 单后端
@@ -28,14 +25,15 @@ Session::Session(const std::string& yaml_file) {
     scfg_ = loadConfig(yaml_file);
     for (auto d : scfg_.devices) {
         if (d == "lynxi") {
-            backend_ = monitor_->getBackend(BACKEND_LYNXI);
+            // backend_ = monitor_->getBackend(BACKEND_LYNXI);
+            backends_.push_back(monitor_->getBackend(BACKEND_LYNXI));
         } else if (d == "dummy") {
-            backend_ = monitor_->getBackend(BACKEND_DUMMY);
+            // backend_ = monitor_->getBackend(BACKEND_DUMMY);
+            backends_.push_back(monitor_->getBackend(BACKEND_DUMMY));
         } else {
-            backend_ = nullptr;
+            assert(0);
         }
     }
-    assert(backend_ != nullptr);
     tq_ = std::make_unique<TaskQueue>();
     // image_path_ = ;
 
@@ -44,7 +42,8 @@ Session::Session(const std::string& yaml_file) {
     model_path_ = scfg_.model_path;
     executors_.reserve(num_executor_);
     for (int i = 0; i < num_executor_; i++) {
-        executors_.emplace_back(std::make_unique<Executor>(model_path_, backend_, tq_.get(), i));
+        // 暂时先都分配到第一个后端上
+        executors_.emplace_back(std::make_unique<Executor>(model_path_, backends_[0], tq_.get(), i));
     }
 }
 
@@ -136,7 +135,6 @@ std::vector<uint8_t> helper(const std::string& image_path) {
 
 SessionOut Session::Run() {
     assert(monitor_ != nullptr);
-    assert(backend_ != nullptr);
 
     for (int i = 0; i < num_task_; i++) {
         std::vector<uint8_t> tensor_bytes;

@@ -10,35 +10,60 @@
 class Lynxi : public Backend {
   public:
     Lynxi(int dev_id);
-    ~Lynxi();
+    virtual ~Lynxi();
 
-    Result Init() override;
-    Result Finalize() override;
-    void Malloc(void **dev_ptr, uint64_t size) override;
-    void Free(void *dev_prt) override;
-    Result MemCopy(void *dst, const void *src, uint64_t size, DIRECTION dir) override;
-    int LoadModel(const std::string &path) override;
-    Result UnloadModel(const std::string& path) override;
-    Result Infer(Executor* e, int model_id, void* dev_input_ptr, void* dev_output_ptr) override;
-    Result InitRtResource(Executor* e) override;
-    const ModelInfo* GetModelInfo(int model_id) const override;
-    Result FinalizeRtResource(Executor*e ) override;
+    Result init() override;
+    Result finalize() override;
+    Result malloc(void **dev_ptr, uint64_t size) override;
+    Result free(void *dev_prt) override;
+    Result memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) override;
+    uint32_t loadModel(const std::string &path) override;
+    Result unloadModel(const std::string& path) override;
+    Result infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) override;
+    const ModelInfo* getModelInfo(uint32_t model_id) const override;
+    
+    Result createStream(Executor* e) override;
+    Result destoryStream(Executor*e ) override;
 
-    const BackendType getType() const { return type_; }
 
   private:
-    BackendType type_{BACKEND_LYNXI};
-    int device_id_;
-    int next_model_id_{0};
+    lynContext_t ctx_{nullptr};
 
-    lynContext_t ctx_{};
+};
 
-    mutable std::mutex stream_lock_;
-    mutable std::mutex model_lock_;
+class LynxiModel : public Model {
+  public:
+    LynxiModel(Backend* backend) : Model(backend) {}
+    virtual ~LynxiModel() {}
+    void* getHandle() override;
+  private:
+    lynModel_t model_;
+};
 
-    std::unordered_map<Executor*, lynStream_t> executor2stream_;
-    std::unordered_map<std::string, int> path2id_;
-    std::unordered_map<int, lynModel_t> models_; // 后端上已加载的模型
-    std::unordered_map<int, std::unique_ptr<ModelInfo>> infos_;
-    
+class LynxiStream : public Stream {
+  public:
+    LynxiStream(Backend* backend) : Stream(backend) {}
+    virtual ~LynxiStream() {}
+    Result synchronize() override;
+    Result createStream() override;
+    Result destoryStream() override;
+    Result recordEvent(Event* event) override;
+    Result waitEvent(Event* event) override;
+    void* getStream() override;
+
+  private:
+    lynStream_t stream_{nullptr};
+};
+
+class LynxiEvent : public Event {
+  public:
+    LynxiEvent(Backend* backend) : Event(backend) {}
+    virtual ~LynxiEvent() {}
+    Result synchronize() override;
+    Result createEvent() override;
+    Result destoryEvent() override;
+    void* getEvent() override;
+
+  private:
+    lynEvent_t event_{nullptr};
 };

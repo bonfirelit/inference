@@ -1,6 +1,8 @@
 #include "session.h"
 #include <cstring>
-
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 void printVector(std::vector<float> v) {
     std::cout << "[ ";
@@ -15,7 +17,7 @@ int main() {
     Session s2(yaml);
     int i = 0;
     int shape_in_yaml = 5;
-    s2.RegisterPreprocess([&]() -> std::vector<uint8_t> {
+    s2.registerPreprocess([&]() -> std::vector<uint8_t> {
         std::vector<float> input(shape_in_yaml, (float)(i));
         i++;
         std::vector<uint8_t> ret(input.size() * sizeof(float));

@@ -16,43 +16,43 @@ Executor::~Executor() {
 
 Result Executor::Execute() {
     INFO_LOG("Executor[%d] Init", id_);
-    RETURN_IF_ERR(Init(), "Executor init fail");
-    INFO_LOG("Executor[%d] LoadModel", id_);
-    RETURN_IF_ERR(LoadModel(), "Exeuctor load model fail");
+    RETURN_IF_ERR(init(), "Executor init fail");
+    INFO_LOG("Executor[%d] loadModel", id_);
+    RETURN_IF_ERR(loadModel(), "Exeuctor load model fail");
     Task task{};
     while (tq_->pop(task)) {
         // 分配设备内存
         INFO_LOG("Executor[%d] PrepareInput", id_);
-        RETURN_IF_ERR(PrepareInput(std::move(task.inputs)), "Executor failed to prepare input");
+        RETURN_IF_ERR(prepareInput(std::move(task.inputs)), "Executor failed to prepare input");
         INFO_LOG("Executor[%d] PrepareOutput", id_);
-        RETURN_IF_ERR(PrepareOutput(), "Executor fail to prepare output");
+        RETURN_IF_ERR(prepareOutput(), "Executor fail to prepare output");
         // 执行
         INFO_LOG("Executor[%d] Run", id_);
-        RETURN_IF_ERR(Run(), "Executor run fail");
+        RETURN_IF_ERR(run(), "Executor run fail");
         // 回调函数将结果传输至session
         INFO_LOG("Executor[%d] GetOutput", id_);
-        task.cb(GetOutput());
+        task.cb(getOutput());
         // 释放设备内存
-        DestroyBuffers();
+        destroyBuffers();
     }
-    RETURN_IF_ERR(UnloadModel(), "Executor unload model fail");
-    RETURN_IF_ERR(Finalize(), "Executor finalize fail");
+    RETURN_IF_ERR(unloadModel(), "Executor unload model fail");
+    RETURN_IF_ERR(finalize(), "Executor finalize fail");
     return SUCCESS;
 }
 
 // 这里的初始化为在后端上初始化运行时资源
-Result Executor::Init() {
-    return backend_->InitRtResource(this);
+Result Executor::init() {
+    return backend_->createStream(this);
 }
 
-Result Executor::Finalize() {
-    return backend_->FinalizeRtResource(this);
+Result Executor::finalize() {
+    return backend_->destoryStream(this);
 }
 
-Result Executor::LoadModel() {
-    model_id_ = backend_->LoadModel(model_path_);
+Result Executor::loadModel() {
+    model_id_ = backend_->loadModel(model_path_);
     assert(model_id_ != -1);
-    info_ = backend_->GetModelInfo(model_id_);
+    info_ = backend_->getModelInfo(model_id_);
     if (!info_) {
         ERROR_LOG("执行器获取ModelInfo失败");
         return FAIL;
@@ -60,13 +60,13 @@ Result Executor::LoadModel() {
     return SUCCESS;
 }
 
-Result Executor::UnloadModel() {
+Result Executor::unloadModel() {
     assert(model_id_ != -1);
-    return backend_->UnloadModel(model_path_);
+    return backend_->unloadModel(model_path_);
 }
 
 // 在设备上分配内存并转移数据
-Result Executor::PrepareInput(std::vector<Tensor>&& inputs) {
+Result Executor::prepareInput(std::vector<Tensor>&& inputs) {
     assert(info_ != nullptr);
 
     size_t inum = inputs.size(), mnum = info_->getInputNum();
@@ -87,32 +87,32 @@ Result Executor::PrepareInput(std::vector<Tensor>&& inputs) {
         return FAIL;
     }
 
-    backend_->Malloc((void**)&dev_input_ptr_, input_size);
+    backend_->malloc((void**)&dev_input_ptr_, input_size);
     assert(dev_input_ptr_ != nullptr);
     auto temp = static_cast<char*>(dev_input_ptr_);
     for (auto& tensor : inputs) {
         auto size = tensor.size();
-        backend_->MemCopy(temp, tensor.data(), size, HOST2HOST);
-        // backend_->MemCopy(temp, tensor.data(), size, HOST2DEVICE);
+        backend_->memcopy(temp, tensor.data(), size, HOST2HOST);
+        // backend_->memcopy(temp, tensor.data(), size, HOST2DEVICE);
         temp += size;
     }
     return SUCCESS;
 }
 
-Result Executor::PrepareOutput() {
+Result Executor::prepareOutput() {
     size_t model_output_size = info_->getBatchSize() * info_->getOutputSize();
-    backend_->Malloc((void**)&dev_output_ptr_, model_output_size);
+    backend_->malloc((void**)&dev_output_ptr_, model_output_size);
     assert(dev_output_ptr_ != nullptr);
     return SUCCESS;
 }
 
 // 同步接口
-Result Executor::Run() {
-    return backend_->Infer(this, model_id_, dev_input_ptr_, dev_output_ptr_);
+Result Executor::run() {
+    return backend_->infer(this, model_id_, dev_input_ptr_, dev_output_ptr_);
 }
 
 // 将输出数据搬回主机
-std::vector<Tensor> Executor::GetOutput() {
+std::vector<Tensor> Executor::getOutput() {
     auto output_num = info_->getOutputNum();
     auto output_size = info_->getOutputSize();
     std::vector<Tensor> outputs;
@@ -127,13 +127,13 @@ std::vector<Tensor> Executor::GetOutput() {
         Tensor& tensor = outputs.back();
         assert(tensor.size() == output_size);
         assert(tensor.data() != nullptr);
-        // auto err = backend_->MemCopy(
+        // auto err = backend_->memcopy(
         //     tensor.data(),
         //     dev_out_ptr + i * output_size,
         //     output_size,
         //     DEVICE2HOST
         // );
-        auto err = backend_->MemCopy(
+        auto err = backend_->memcopy(
             tensor.data(),
             dev_out_ptr + i * output_size,
             output_size,
@@ -147,7 +147,7 @@ std::vector<Tensor> Executor::GetOutput() {
     return outputs;
 }
 
-void Executor::DestroyBuffers() {
-    backend_->Free(dev_input_ptr_);
-    backend_->Free(dev_output_ptr_);
+void Executor::destroyBuffers() {
+    backend_->free(dev_input_ptr_);
+    backend_->free(dev_output_ptr_);
 }
