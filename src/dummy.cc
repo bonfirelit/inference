@@ -63,7 +63,7 @@ Result Dummy::unloadModel(const std::string& path) {
     return SUCCESS;
 }
 
-Result Dummy::infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
+Result Dummy::infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
     // std::lock_guard<std::mutex> lock(model_lock_);
     // if (!info_) {
     //     ERROR_LOG("Dummy infer failed: no model loaded");
@@ -81,10 +81,11 @@ Result Dummy::infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* d
     return SUCCESS;
 }
 
-Result Dummy::createStream(Executor* e) {
+std::unique_ptr<Stream> Dummy::createStream() {
     INFO_LOG("--Dummy createStream Start--");
-    INFO_LOG("Dummy createStream success");
-    return SUCCESS;
+    std::unique_ptr<DummyStream> dummy_stream = std::make_unique<DummyStream>(this);
+    dummy_stream->createStream();
+    return dummy_stream;
 }
 
 const ModelInfo* Dummy::getModelInfo(uint32_t model_id) const {
@@ -94,8 +95,26 @@ const ModelInfo* Dummy::getModelInfo(uint32_t model_id) const {
     return info_.get();
 }
 
-Result Dummy::destoryStream(Executor*e ) {
+Result Dummy::destoryStream(Stream* stream) {
     INFO_LOG("--Dummy destoryStream Start--");
+    stream->destoryStream();
     INFO_LOG("Dummy destoryStream success");
     return SUCCESS;
+}
+
+Result DummyStream::createStream() {
+    INFO_LOG("#### DummyStream create stream success ####");
+    stream_ = std::malloc(1);
+    assert(stream_ != nullptr);
+    return SUCCESS;
+}
+
+Result DummyStream::destoryStream() {
+    INFO_LOG("#### DummyStream destory stream success ####");
+    std::free(stream_);
+    return SUCCESS;
+}
+
+void* DummyStream::getStream() {
+    return stream_;
 }

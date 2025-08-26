@@ -42,11 +42,16 @@ Result Executor::Execute() {
 
 // 这里的初始化为在后端上初始化运行时资源
 Result Executor::init() {
-    return backend_->createStream(this);
+    stream_ = backend_->createStream();
+    if (stream_->getStream() == nullptr) {
+        ERROR_LOG("IT'S NULL PTR!!!!!!!!!!!!!!!!!!");
+        return FAIL;
+    }
+    return SUCCESS;
 }
 
 Result Executor::finalize() {
-    return backend_->destoryStream(this);
+    return backend_->destoryStream(stream_.get());
 }
 
 Result Executor::loadModel() {
@@ -108,7 +113,7 @@ Result Executor::prepareOutput() {
 
 // 同步接口
 Result Executor::run() {
-    return backend_->infer(this, model_id_, dev_input_ptr_, dev_output_ptr_);
+    return backend_->infer(stream_.get(), model_id_, dev_input_ptr_, dev_output_ptr_);
 }
 
 // 将输出数据搬回主机

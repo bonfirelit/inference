@@ -1,11 +1,11 @@
 #include "backend/lynxi.h"
 
-Lynxi::Lynxi(int dev_id) : Backend(BACKEND_LYNXI, dev_id) {}
-
-Lynxi::~Lynxi() {
-    // ?????
-    lynDestroyContext(ctx_);
+Lynxi::Lynxi(int dev_id) : Backend(BACKEND_LYNXI, dev_id) {
+    // 不setDevice也能用
+    // lynSetDevice(dev_id);
 }
+
+Lynxi::~Lynxi() {}
 
 
 Result Lynxi::init() {
@@ -174,20 +174,10 @@ Result Lynxi::unloadModel(const std::string& path) {
     return SUCCESS;
 }
 
-Result Lynxi::infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
-    lynStream_t stream;
+Result Lynxi::infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
+    lynStream_t lynstream = stream->getStream();
     lynModel_t model;
     size_t batch_size;
-
-    {
-        std::lock_guard<std::mutex> lock(stream_lock_);
-        auto it = exec_to_stream_.find(e);
-        if (it == exec_to_stream_.end()) {
-            ERROR_LOG("executor对应stream不存在");
-            return FAIL;
-        }
-        stream = (lynStream_t)it->second->getStream();
-    }
 
     {
         std::lock_guard<std::mutex> lock(model_lock_);
@@ -201,8 +191,8 @@ Result Lynxi::infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* d
         batch_size = it_info->second->getBatchSize();
     }
 
-    lynExecuteModelAsync(stream, model, dev_input_ptr, dev_output_ptr, batch_size);
-    lynSynchronizeStream(stream);
+    lynExecuteModelAsync(lynstream, model, dev_input_ptr, dev_output_ptr, batch_size);
+    lynSynchronizeStream(lynstream);
     return SUCCESS;
 }
 
@@ -216,38 +206,20 @@ const ModelInfo* Lynxi::getModelInfo(uint32_t model_id) const {
     return it->second.get();
 }
 
-Result Lynxi::createStream(Executor* e) {
+std::unique_ptr<Stream> Lynxi::createStream() {
     auto err = lynSetCurrentContext(ctx_);
     if (err != 0) {
         ERROR_LOG("lynSetCurrentContext Fail");
-        return FAIL;
+        return std::make_unique<LynxiStream>(this);
     }
-
+    
     std::unique_ptr<LynxiStream> stream = std::make_unique<LynxiStream>(this);
-    Result res = stream->createStream();
-    if (res == FAIL) {
-        return res;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(stream_lock_);    
-        exec_to_stream_[e] = std::move(stream);
-    }
-    return SUCCESS;
+    stream->createStream();
+    return stream;
 }
 
-Result Lynxi::destoryStream(Executor* e) {
-    std::lock_guard<std::mutex> lock(stream_lock_);
-    auto it = exec_to_stream_.find(e);
-    Result res = SUCCESS;
-    if (it != exec_to_stream_.end()) {
-        res = it->second->destoryStream();
-        exec_to_stream_.erase(it);
-    } else {
-        ERROR_LOG("stream不存在");
-        return FAIL;
-    }
-    return res;
+Result Lynxi::destoryStream(Stream* stream) {
+    return stream->destoryStream();
 }
 
 void* LynxiModel::getHandle() {

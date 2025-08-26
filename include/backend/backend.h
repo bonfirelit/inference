@@ -8,7 +8,6 @@ class Stream;
 class Model;
 class Event;
 
-// TODO:添加Stream抽象类，Event抽象类
 class Backend {
   public:
     Backend(BackendType type, int device_id) 
@@ -23,11 +22,11 @@ class Backend {
     virtual Result memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) = 0;
     virtual uint32_t loadModel(const std::string &path) = 0;
     virtual Result unloadModel(const std::string& path) = 0;
-    virtual Result infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) = 0;
+    virtual Result infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) = 0;
     virtual const ModelInfo* getModelInfo(uint32_t model_id) const = 0;
 
-    virtual Result createStream(Executor* e) = 0;
-    virtual Result destoryStream(Executor*e ) = 0;
+    virtual std::unique_ptr<Stream> createStream() = 0;
+    virtual Result destoryStream(Stream* stream) = 0;
 
     BackendType getBackendType() { return type_; }
 
@@ -36,10 +35,8 @@ class Backend {
     uint32_t next_model_id_{0};
     BackendType type_;
 
-    mutable std::mutex stream_lock_;
     mutable std::mutex model_lock_;
 
-    std::unordered_map<Executor*, std::unique_ptr<Stream>> exec_to_stream_;
     std::unordered_map<std::string, uint32_t> path_to_id_;
     std::unordered_map<uint32_t, std::unique_ptr<Model>> models_;
     std::unordered_map<uint32_t, std::unique_ptr<ModelInfo>> infos_;
@@ -58,6 +55,7 @@ class Model {
 
 class Stream {
   public:
+    Stream() = default;
     Stream(Backend* backend) : backend_(backend) {}
     virtual ~Stream() {}
     virtual Result synchronize() { return SUCCESS; }

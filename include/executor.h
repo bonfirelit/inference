@@ -21,6 +21,7 @@ class Executor {
     uint32_t model_id_{0};
     
     const ModelInfo* info_{nullptr};
+    std::unique_ptr<Stream> stream_;
     
     void* dev_input_ptr_{nullptr};
     void* dev_output_ptr_{nullptr};

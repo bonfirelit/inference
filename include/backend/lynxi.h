@@ -19,11 +19,11 @@ class Lynxi : public Backend {
     Result memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) override;
     uint32_t loadModel(const std::string &path) override;
     Result unloadModel(const std::string& path) override;
-    Result infer(Executor* e, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) override;
+    Result infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) override;
     const ModelInfo* getModelInfo(uint32_t model_id) const override;
     
-    Result createStream(Executor* e) override;
-    Result destoryStream(Executor*e ) override;
+    std::unique_ptr<Stream> createStream() override;
+    Result destoryStream(Stream* stream) override;
 
 
   private:

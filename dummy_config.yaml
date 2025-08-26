@@ -1,5 +1,5 @@
 model_path: "dummy"
-num_executor: 4
+num_executor: 9
 num_task: 6
 devices: ["dummy"]
 
