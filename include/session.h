@@ -5,6 +5,7 @@
 #include "tensor.h"
 #include "monitor.h"
 #include "task_queue.h"
+#include <any>
 
 /*
 为什么是三重vector？
@@ -12,7 +13,7 @@
 */
 using SessionOut = std::vector<std::vector<std::vector<float>>>;
 
-using PreprocessFn = std::function<std::vector<uint8_t>()>;
+using PreprocessFn = std::function<std::vector<uint8_t>(const std::any&)>;
 using PostprocessFn = std::function<void(const std::vector<Tensor>& outputs)>;
 
 struct TensorCfg {

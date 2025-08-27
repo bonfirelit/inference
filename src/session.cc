@@ -140,7 +140,7 @@ SessionOut Session::Run() {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
             INFO_LOG("Session is preprocessing now");
-            tensor_bytes = preprocess_fn_();
+            tensor_bytes = preprocess_fn_("bad_path");
             INFO_LOG("Session preprocess down");
         }
 
