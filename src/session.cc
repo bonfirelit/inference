@@ -1,6 +1,6 @@
 #include "common.h"
 #include "session.h"
-#include <yaml.h>
+#include <yaml-cpp/yaml.h>
 
 // 单后端
 Session::Session(BackendType type, int num_executor, const std::string& model_path,
