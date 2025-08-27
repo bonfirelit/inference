@@ -27,8 +27,14 @@ set(MAIN_SRC
 
 # 构建动态库
 add_library(inference SHARED ${LIB_SRC})
-target_link_libraries(inference PUBLIC pthread yaml-cpp opencv_core opencv_imgproc opencv_imgcodecs)
-
+target_link_libraries(inference
+    PUBLIC
+        pthread
+        yaml-cpp
+        opencv_core
+        opencv_imgproc
+        opencv_imgcodecs
+)
 # 构建可执行文件
 add_executable(inference_app ${MAIN_SRC})
 
