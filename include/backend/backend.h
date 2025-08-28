@@ -46,7 +46,7 @@ class Model {
   public:
     Model(Backend* backend) : backend_(backend) {}
     virtual ~Model() {}
-    virtual void* getHandle() = 0;
+    virtual void* getHandle() { return nullptr; }
     Backend* getBackend() { return backend_; }
 
   protected:

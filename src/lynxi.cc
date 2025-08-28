@@ -115,24 +115,22 @@ uint32_t Lynxi::loadModel(const std::string &path) {
         std::vector<std::vector<uint32_t>> outs_dim;
         for (int i = 0; i < output_num; i++) {
             uint32_t dim_count = 0;
-            lynModelGetOutputTensorDimsByIndex(model, i, nullptr, &dim_count);
-            assert(dim_count > 0);
-            std::vector<uint32_t> dim(dim_count);
+            std::vector<uint32_t> dim(sizeof(uint32_t) * LYN_MAX_DIMS_COUNT);
             lynModelGetOutputTensorDimsByIndex(model, i, dim.data(), &dim_count);
+            dim.resize(dim_count);
             outs_dim.emplace_back(std::move(dim));
         }
         std::vector<std::vector<uint32_t>> ins_dim;
         for (int i = 0; i < input_num; i++) {
             uint32_t dim_count = 0;
-            lynModelGetInputTensorDimsByIndex(model, i, nullptr, &dim_count);
-            assert(dim_count > 0);
-            std::vector<uint32_t> dim(dim_count);
+            std::vector<uint32_t> dim(sizeof(uint32_t) * LYN_MAX_DIMS_COUNT);
             lynModelGetInputTensorDimsByIndex(model, i, dim.data(), &dim_count);
+            dim.resize(dim_count);
             ins_dim.emplace_back(std::move(dim));
         }
 
         path_to_id_[path] = model_id;
-        models_[model_id] = std::make_unique<LynxiModel>(this);
+        models_[model_id] = std::make_unique<LynxiModel>(this, model);
         infos_[model_id] = std::make_unique<ModelInfo>(
             batch_size,
             input_size,

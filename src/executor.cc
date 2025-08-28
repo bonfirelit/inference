@@ -2,11 +2,12 @@
 
 // 要保证调用构造函数时，backend_type一定是合法的
 // 入参的backend指针代表该执行器在这个后端上运行
-Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id) 
+Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id, DataType otype) 
     : backend_(backend)
     , model_path_(model_path)
     , tq_(tq)
-    , id_(id) {
+    , id_(id)
+    , output_type_(otype) {
         INFO_LOG("executor[%d] created!", id_);
     }
 
@@ -97,8 +98,8 @@ Result Executor::prepareInput(std::vector<Tensor>&& inputs) {
     auto temp = static_cast<char*>(dev_input_ptr_);
     for (auto& tensor : inputs) {
         auto size = tensor.size();
-        backend_->memcopy(temp, tensor.data(), size, HOST2HOST);
-        // backend_->memcopy(temp, tensor.data(), size, HOST2DEVICE);
+        // backend_->memcopy(temp, tensor.data(), size, HOST2HOST);
+        backend_->memcopy(temp, tensor.data(), size, HOST2DEVICE);
         temp += size;
     }
     return SUCCESS;
@@ -128,22 +129,22 @@ std::vector<Tensor> Executor::getOutput() {
 
     auto dev_out_ptr = static_cast<const char*>(dev_output_ptr_);
     for (int i = 0; i < output_num; i++) {
-        outputs.emplace_back(shapes[i], FLOAT32);
+        outputs.emplace_back(shapes[i], output_type_);
         Tensor& tensor = outputs.back();
         assert(tensor.size() == output_size);
         assert(tensor.data() != nullptr);
-        // auto err = backend_->memcopy(
-        //     tensor.data(),
-        //     dev_out_ptr + i * output_size,
-        //     output_size,
-        //     DEVICE2HOST
-        // );
         auto err = backend_->memcopy(
             tensor.data(),
             dev_out_ptr + i * output_size,
             output_size,
-            HOST2HOST
+            DEVICE2HOST
         );
+        // auto err = backend_->memcopy(
+        //     tensor.data(),
+        //     dev_out_ptr + i * output_size,
+        //     output_size,
+        //     HOST2HOST
+        // );
         if (err != SUCCESS) {
             ERROR_LOG("Executor Getoutput fail");
             return {};

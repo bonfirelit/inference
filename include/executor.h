@@ -9,7 +9,7 @@
 
 class Executor {
   public:
-    Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id);
+    Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id, DataType otype);
     ~Executor();
     Result Execute();
     
@@ -25,6 +25,7 @@ class Executor {
     
     void* dev_input_ptr_{nullptr};
     void* dev_output_ptr_{nullptr};
+    DataType output_type_; // bad, for now
     
     Result loadModel();
     Result unloadModel();

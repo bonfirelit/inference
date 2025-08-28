@@ -26,6 +26,8 @@
 enum DataType {
   FLOAT32,
   INT8,
+  UINT8,
+  FLOAT16,
 };
 
 enum Result {
@@ -64,3 +66,14 @@ enum DIRECTION {
 //       return Result::FAIL;                  \
 //     }                                \
 //   } while (0)
+
+
+static DataType stringToDataType(const std::string& str) {
+    std::string s = str;
+
+    if (s == "float32") return FLOAT32;
+    else if (s == "int8") return INT8;
+    else if (s == "uint8") return UINT8;
+    else if (s == "float16") return FLOAT16;
+    else assert(0);
+}

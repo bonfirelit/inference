@@ -68,6 +68,7 @@
         "cfenv": "cpp",
         "typeindex": "cpp",
         "list": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "any": "cpp"
     }
 }

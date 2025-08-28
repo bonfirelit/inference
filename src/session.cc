@@ -15,7 +15,7 @@ const std::string& image_path) {
     num_executor_ = num_executor;
     executors_.reserve(num_executor);
     for (int i = 0; i < num_executor; i++) {
-        executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get(), i));
+        executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get(), i, FLOAT32));
     }
 }
 
@@ -41,9 +41,10 @@ Session::Session(const std::string& yaml_file) {
     num_task_ = scfg_.num_task;
     model_path_ = scfg_.model_path;
     executors_.reserve(num_executor_);
+    auto output_dtype = stringToDataType(scfg_.outputs[0].dtype);
     for (int i = 0; i < num_executor_; i++) {
         // 暂时先都分配到第一个后端上
-        executors_.emplace_back(std::make_unique<Executor>(model_path_, backends_[0], tq_.get(), i));
+        executors_.emplace_back(std::make_unique<Executor>(model_path_, backends_[0], tq_.get(), i, output_dtype));
     }
 }
 
@@ -140,18 +141,21 @@ SessionOut Session::Run() {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
             INFO_LOG("Session is preprocessing now");
-            tensor_bytes = preprocess_fn_("bad_path");
+            tensor_bytes = preprocess_fn_(scfg_.input_file);
+            assert(tensor_bytes.size() > 0);
             INFO_LOG("Session preprocess down");
         }
 
         INFO_LOG("Session Create Task[%d] now", i);
+        // TODO: 这里假设了模型只有一个输入张量
         std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
-        // INFO_LOG("The input shape is:");
-        // for (auto x : in_shape) {
-        //     printf("%d ", x);
-        // }
-        // printf("\n");
-        Task task{std::vector<Tensor>{{tensor_bytes, in_shape, FLOAT32}}, 
+        auto in_dtype = scfg_.inputs[0].dtype;
+        INFO_LOG("The input shape is:");
+        for (auto x : in_shape) {
+            printf("%d ", x);
+        }
+        printf("\n");
+        Task task{std::vector<Tensor>{{tensor_bytes, in_shape, stringToDataType(in_dtype)}}, 
                 [this](std::vector<Tensor>&& outputs) {
                     outputs_.emplace_back(std::move(outputs));
                     // 每完成一个任务，计数器减一
@@ -189,10 +193,10 @@ SessionOut Session::Run() {
 
     for (auto result : outputs_) {
         // result是一个任务的所有输出张量
-        std::vector<std::vector<float>> task_out;
+        std::vector<std::vector<uint8_t>> task_out;      
         task_out.reserve(result.size());
         for (auto tensor : result) {
-            task_out.emplace_back(tensor.asVector<float>());
+            task_out.emplace_back(tensor.asVector());
         }
         ret.push_back(task_out);
     }
@@ -207,6 +211,8 @@ SessionCfg Session::loadConfig(const std::string& yaml_file) {
     sc.model_path   = config["model_path"].as<std::string>();
     sc.num_executor = config["num_executor"].as<int>();
     sc.num_task     = config["num_task"].as<int>();
+    sc.input_file   = config["input_file"].as<std::string>();
+
     for (auto d : config["devices"]) {
         sc.devices.push_back(d.as<std::string>());
     }

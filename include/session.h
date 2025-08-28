@@ -11,7 +11,7 @@
 为什么是三重vector？
 第一维代表每个推理任务的输出，而每个推理任务的输出又是多个vector<float>
 */
-using SessionOut = std::vector<std::vector<std::vector<float>>>;
+using SessionOut = std::vector<std::vector<std::vector<uint8_t>>>;
 
 using PreprocessFn = std::function<std::vector<uint8_t>(const std::any&)>;
 using PostprocessFn = std::function<void(const std::vector<Tensor>& outputs)>;
@@ -27,6 +27,7 @@ struct SessionCfg {
     std::string model_path;
     int num_executor;
     int num_task;
+    std::string input_file;
     std::vector<std::string> devices;
     std::vector<TensorCfg> inputs;
     std::vector<TensorCfg> outputs;

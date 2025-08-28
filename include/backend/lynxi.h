@@ -4,8 +4,8 @@
 #include "backend.h"
 #include "executor.h"
 #include "model_info.h"
-#include "/usr/include/lynapi/lyn_api.h"
-
+#include <lyn_api.h>
+#include <lyn_smi.h>
 
 class Lynxi : public Backend {
   public:
@@ -33,7 +33,7 @@ class Lynxi : public Backend {
 
 class LynxiModel : public Model {
   public:
-    LynxiModel(Backend* backend) : Model(backend) {}
+    LynxiModel(Backend* backend, lynModel_t model) : Model(backend), model_(model) {}
     virtual ~LynxiModel() {}
     void* getHandle() override;
   private:

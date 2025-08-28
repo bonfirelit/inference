@@ -36,6 +36,8 @@ public:
       switch (dtype) {
         case DataType::FLOAT32: return 4;
         case DataType::INT8:   return 1;
+        case DataType::FLOAT16: return 2;
+        case DataType::UINT8: return 1;
         default: assert(0);
       }
     }
@@ -50,17 +52,17 @@ public:
       return reinterpret_cast<const T*>(data_.data());
     }
 
-    template<typename T>
-    std::vector<T> asVector() const {
-      // if (getElementSize(dataType()) != sizeof(T)) {
-      //     throw std::runtime_error("asVector<T> type mismatch with Tensor's dataType");
-      // }
-      assert(getElementSize(dataType()) == sizeof(T));
-      size_t count = size_ / sizeof(T);
-      const T* ptr = reinterpret_cast<const T*>(data_.data());
-      return std::vector<T>(ptr, ptr + count);
+    // template<typename T>
+    // std::vector<T> asVector() const {
+    //   assert(getElementSize(dataType()) == sizeof(T));
+    //   size_t count = size_ / sizeof(T);
+    //   const T* ptr = reinterpret_cast<const T*>(data_.data());
+    //   return std::vector<T>(ptr, ptr + count);
+    // }
+    
+    std::vector<uint8_t> asVector() const {
+        return data_;
     }
-
 
 
 private:
