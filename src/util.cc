@@ -1,5 +1,15 @@
 #include "util.h"
 
+size_t getElementSize(DataType dtype) {
+    switch (dtype) {
+    case DataType::FLOAT32: return 4;
+    case DataType::INT8:   return 1;
+    case DataType::FLOAT16: return 2;
+    case DataType::UINT8: return 1;
+    default: assert(0);
+    }
+}
+
 DataType stringToDataType(const std::string& str) {
     std::string s = str;
 

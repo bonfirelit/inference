@@ -102,7 +102,7 @@ SessionOut Session::Run() {
     }
 
     // TODO:添加计算每个exeutor执行时间的代码
-    INFO_LOG("Session Run over, output size = %ld", outputs_.size());
+    INFO_LOG("Session Run over, output size = %ld", outputs_[0].size());
     // 返回结果
     
     SessionOut ret;
@@ -110,7 +110,8 @@ SessionOut Session::Run() {
 
     for (auto result : outputs_) {
         // result是一个任务的所有输出张量
-        std::vector<std::vector<uint8_t>> task_out;      
+        std::vector<std::vector<uint8_t>> task_out;
+        INFO_LOG("### This model's output has %ld tensor ###", result.size());      
         task_out.reserve(result.size());
         for (auto tensor : result) {
             task_out.emplace_back(tensor.asVector());

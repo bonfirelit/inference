@@ -6,6 +6,7 @@
 #include "backend/lynxi.h"
 #include "task_queue.h"
 #include "tensor.h"
+#include "util.h"
 
 class Executor {
   public:

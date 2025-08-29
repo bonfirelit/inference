@@ -8,6 +8,7 @@
 #include "util.h"
 #include <any>
 
+// 第一维是任务，第二维是每个任务的多个输出张量
 using SessionOut = std::vector<std::vector<std::vector<uint8_t>>>;
 
 using PreprocessFn = std::function<std::vector<uint8_t>(const std::any&)>;

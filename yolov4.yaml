@@ -1,0 +1,18 @@
+model_path: "../../yolov4/model/Net_0"
+num_executor: 1
+num_task: 1
+devices: ["lynxi"]
+
+input_file: "../../yolov4/data/dog.jpg"
+
+inputs:
+  - shape: [1, 416, 416, 3]
+    dtype: float32
+
+outputs:
+  - shape: [1, 52, 52, 3, 85]
+    dtype: float32
+  - shape: [1, 26, 26, 3, 85]
+    dtype: float32
+  - shape: [1, 13, 13, 3, 85]
+    dtype: float32

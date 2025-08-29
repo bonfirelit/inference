@@ -1,0 +1,14 @@
+model_path: "../../lenet/model/Net_0"
+num_executor: 1
+num_task: 1
+devices: ["lynxi"]
+
+input_file: "../../lenet/mnistbindata/mnist_7.bin"
+
+inputs:
+  - shape: [1, 28, 28, 1]
+    dtype: uint8
+
+outputs:
+  - shape: [1,10]
+    dtype: float16

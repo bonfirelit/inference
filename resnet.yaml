@@ -1,0 +1,14 @@
+model_path: "../../resnet/model/Net_0"
+num_executor: 1
+num_task: 1
+devices: ["lynxi"]
+
+input_file: "../../resnet/data/lynx.jpg"
+
+inputs:
+  - shape: [1, 3, 224, 224]
+    dtype: float32
+
+outputs:
+  - shape: [1,1000]
+    dtype: float32

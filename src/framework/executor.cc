@@ -34,6 +34,7 @@ Result Executor::Execute() {
         INFO_LOG("Executor[%d] GetOutput", id_);
         task.cb(getOutput());
         // 释放设备内存
+        INFO_LOG("Executor[%d] start to free buffer", id_);
         destroyBuffers();
     }
     RETURN_IF_ERR(unloadModel(), "Executor unload model fail");
@@ -98,7 +99,6 @@ Result Executor::prepareInput(std::vector<Tensor>&& inputs) {
     auto temp = static_cast<char*>(dev_input_ptr_);
     for (auto& tensor : inputs) {
         auto size = tensor.size();
-        // backend_->memcopy(temp, tensor.data(), size, HOST2HOST);
         backend_->memcopy(temp, tensor.data(), size, HOST2DEVICE);
         temp += size;
     }
@@ -120,7 +120,6 @@ Result Executor::run() {
 // 将输出数据搬回主机
 std::vector<Tensor> Executor::getOutput() {
     auto output_num = info_->getOutputNum();
-    auto output_size = info_->getOutputSize();
     std::vector<Tensor> outputs;
     outputs.reserve(output_num);
 
@@ -129,8 +128,12 @@ std::vector<Tensor> Executor::getOutput() {
 
     auto dev_out_ptr = static_cast<const char*>(dev_output_ptr_);
     for (int i = 0; i < output_num; i++) {
+        INFO_LOG("Executor is get number %d output tensor", i);
         outputs.emplace_back(shapes[i], output_type_);
         Tensor& tensor = outputs.back();
+        size_t output_size = getElementSize(output_type_) * std::accumulate(
+          shapes[i].begin(), shapes[i].end(), 1u, std::multiplies<uint32_t>()
+          );
         assert(tensor.size() == output_size);
         assert(tensor.data() != nullptr);
         auto err = backend_->memcopy(
@@ -139,12 +142,6 @@ std::vector<Tensor> Executor::getOutput() {
             output_size,
             DEVICE2HOST
         );
-        // auto err = backend_->memcopy(
-        //     tensor.data(),
-        //     dev_out_ptr + i * output_size,
-        //     output_size,
-        //     HOST2HOST
-        // );
         if (err != SUCCESS) {
             ERROR_LOG("Executor Getoutput fail");
             return {};

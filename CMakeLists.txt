@@ -53,6 +53,7 @@ endif()
 set(APP_SRCS
     src/app/resnet.cc
     src/app/lenet.cc
+    src/app/yolo.cc
 )
 
 foreach(app_src ${APP_SRCS})
