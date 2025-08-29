@@ -2,7 +2,6 @@
 
 #include "common.h"
 
-class Executor;
 class ModelInfo;
 class Stream;
 class Model;

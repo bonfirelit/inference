@@ -2,7 +2,6 @@
 
 #include "common.h"
 #include "backend.h"
-#include "executor.h"
 #include "model_info.h"
 #include <lyn_api.h>
 #include <lyn_smi.h>
