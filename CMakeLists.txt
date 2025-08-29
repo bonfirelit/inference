@@ -20,8 +20,11 @@ target_link_directories(inference
         ${CMAKE_SOURCE_DIR}/3rd_party/opencv/lib
         ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/lib
         ${CMAKE_SOURCE_DIR}/3rd_party/yaml/lib/arm
-        /usr/local/lynxi/sdk/libs
 )
+
+if(EXISTS "/usr/local/lynxi/sdk/libs")
+    target_link_directories(inference PUBLIC /usr/local/lynxi/sdk/libs)
+endif()
 
 target_link_libraries(inference
     PUBLIC
@@ -40,8 +43,12 @@ target_include_directories(inference
     ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
     ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
     ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
-    /usr/local/lynxi/sdk/include
 )
+
+if(EXISTS "/usr/local/lynxi/sdk/include")
+    target_include_directories(inference PUBLIC /usr/local/lynxi/sdk/include)
+endif()
+
 
 set(APP_SRCS
     src/app/resnet.cc
