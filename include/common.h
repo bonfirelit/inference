@@ -16,6 +16,8 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <cstring>
+#include <algorithm>
 
 // INFO_LOG("info %d %d", 8, num);
 #define INFO_LOG(fmt, ...) fprintf(stdout, "[INFO]  " fmt "\n", ##__VA_ARGS__)
@@ -56,24 +58,3 @@ enum DIRECTION {
       return err__;                                        \
     }                                                      \
   } while (0)
-
-
-// #define LYNXI_CHECK_ERR(X, fmt, ...)           \
-//   do {                               \
-//     lynError_t err__ = (X); \
-//     if (err__ != 0) {          \
-//       fprintf(stderr, "[ERROR]  " fmt "\n", ##__VA_ARGS__); \
-//       return Result::FAIL;                  \
-//     }                                \
-//   } while (0)
-
-
-static DataType stringToDataType(const std::string& str) {
-    std::string s = str;
-
-    if (s == "float32") return FLOAT32;
-    else if (s == "int8") return INT8;
-    else if (s == "uint8") return UINT8;
-    else if (s == "float16") return FLOAT16;
-    else assert(0);
-}
