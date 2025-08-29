@@ -1,33 +1,9 @@
 #include "session.h"
 #include <fstream>
-#include <cstring>
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 
-void printVector(std::vector<uint16_t> v) {
-    std::cout << "[ ";
-    for (auto x : v) {
-        std::cout << x << " ";
-    }
-    std::cout << "]" << std::endl;
-}
-
-std::vector<uint16_t> bytesToUint16(const std::vector<uint8_t>& bytes) {
-    assert(bytes.size() % 2 == 0);
-
-    size_t count = bytes.size() / 2;
-    std::vector<uint16_t> result(count);
-
-    for (size_t i = 0; i < count; ++i) {
-        result[i] = static_cast<uint16_t>(bytes[2 * i]) |
-                    (static_cast<uint16_t>(bytes[2 * i + 1]) << 8);
-    }
-
-    return result;
-}
-
-/*
 std::vector<uint8_t> resnetPreprocess(const std::any& arg) {
     auto path = std::any_cast<std::string>(&arg);
     if (path == nullptr) {
@@ -69,7 +45,7 @@ std::vector<uint8_t> resnetPreprocess(const std::any& arg) {
     }
     cv::merge(channels, floatImg);
 
-    // 7. HWC -> CHW
+    // HWC -> CHW
     cv::split(floatImg, channels);
     std::vector<float> chw;
     chw.reserve(3 * 224 * 224);
@@ -77,51 +53,23 @@ std::vector<uint8_t> resnetPreprocess(const std::any& arg) {
         chw.insert(chw.end(), (float*)channels[i].datastart, (float*)channels[i].dataend);
     }
 
-    // 8. float32 -> uint8_t（字节序列）
+    // float32 -> uint8_t
     std::vector<uint8_t> bytes(chw.size() * sizeof(float));
     std::memcpy(bytes.data(), chw.data(), chw.size() * sizeof(float));
 
-    return bytes; // 返回的字节序列，内部其实是 float32
-}
-    
-*/
-
-
-std::vector<uint8_t> lenetPreprocess(const std::any& arg) {
-    auto path = std::any_cast<std::string>(&arg);
-    assert(path != nullptr);
-    std::ifstream binFile(*path, std::ifstream::binary);
-    if (binFile.is_open() != true) {
-        ERROR_LOG("file is not opened");
-        return {};
-    }
-    binFile.seekg(0, binFile.end);
-    uint32_t binFileBufferLen = binFile.tellg();
-    if (binFileBufferLen == 0 || binFileBufferLen != 784) {
-        ERROR_LOG("file size error");
-        return {};
-    }
-    binFile.seekg(0,binFile.beg);
-    uint8_t *hostBuf = (uint8_t *)malloc(784);
-    if (nullptr != hostBuf) {
-        binFile.read((char *)(hostBuf), binFileBufferLen);
-    }
-    std::vector<uint8_t> result(hostBuf, hostBuf + binFileBufferLen);
-    free(hostBuf);
-
-    return result;
+    return bytes;
 }
 
 
 int main() {
-    std::string yaml = "../lenet.yaml";
+    std::string yaml = "../resnet.yaml";
     Session s2(yaml);
-    s2.registerPreprocess(lenetPreprocess);
+    s2.registerPreprocess(resnetPreprocess);
     auto outputs = s2.Run();
     for (int i = 0; i < outputs.size(); i++) {
         printf("task[%d]'s output:\n", i);
         for (auto task_out : outputs[i]) {
-            printVector(bytesToUint16(task_out));
+            printVector(top5Indices(bytesToFloat32(task_out)));
         }
     }
 }
