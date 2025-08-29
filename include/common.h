@@ -24,6 +24,16 @@
 #define WARN_LOG(fmt, ...) fprintf(stdout, "[WARN]  " fmt "\n", ##__VA_ARGS__)
 #define ERROR_LOG(fmt, ...) fprintf(stderr, "[ERROR]  " fmt "\n", ##__VA_ARGS__)
 
+#define RETURN_IF_ERR(expr, msg)                           \
+  do {                                                     \
+    auto err__ = (expr);                                   \
+    if (err__ != SUCCESS) {                                \
+      std::cerr << "[ERROR] " << #expr << " failed: " << msg << std::endl; \
+      return err__;                                        \
+    }                                                      \
+  } while (0)
+
+  
 
 enum DataType {
   FLOAT32,
@@ -49,12 +59,3 @@ enum DIRECTION {
     DEVICE2HOST,
     HOST2HOST,
 };
-
-#define RETURN_IF_ERR(expr, msg)                           \
-  do {                                                     \
-    auto err__ = (expr);                                   \
-    if (err__ != SUCCESS) {                                \
-      std::cerr << "[ERROR] " << #expr << " failed: " << msg << std::endl; \
-      return err__;                                        \
-    }                                                      \
-  } while (0)

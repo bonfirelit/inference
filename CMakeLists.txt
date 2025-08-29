@@ -5,12 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(LIB_SRC
-    src/executor.cc
-    src/lynxi.cc
-    src/monitor.cc
-    src/session.cc
+    src/framework/executor.cc
+    src/framework/monitor.cc
+    src/framework/session.cc
     src/util.cc
-    src/dummy.cc
+    src/framework/backend/lynxi.cc
+    src/framework/backend/dummy.cc
 )
 
 add_library(inference SHARED ${LIB_SRC})
@@ -44,8 +44,8 @@ target_include_directories(inference
 )
 
 set(APP_SRCS
-    src/resnet.cc
-    src/lenet.cc
+    src/app/resnet.cc
+    src/app/lenet.cc
 )
 
 foreach(app_src ${APP_SRCS})

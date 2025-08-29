@@ -2,40 +2,20 @@
 #include "session.h"
 #include <yaml-cpp/yaml.h>
 
-// 单后端
-Session::Session(BackendType type, int num_executor, const std::string& model_path,
-const std::string& image_path) {
-    monitor_ = Monitor::getInstance();
-
-    backend_ = monitor_->getBackend(type);
-    assert(backend_ != nullptr);
-    tq_ = std::make_unique<TaskQueue>();
-    image_path_ = image_path;
-
-    num_executor_ = num_executor;
-    executors_.reserve(num_executor);
-    for (int i = 0; i < num_executor; i++) {
-        executors_.emplace_back(std::make_unique<Executor>(model_path, backend_, tq_.get(), i, FLOAT32));
-    }
-}
-
 Session::Session(const std::string& yaml_file) {
     monitor_ = Monitor::getInstance();
 
     scfg_ = loadConfig(yaml_file);
     for (auto d : scfg_.devices) {
         if (d == "lynxi") {
-            // backend_ = monitor_->getBackend(BACKEND_LYNXI);
             backends_.push_back(monitor_->getBackend(BACKEND_LYNXI));
         } else if (d == "dummy") {
-            // backend_ = monitor_->getBackend(BACKEND_DUMMY);
             backends_.push_back(monitor_->getBackend(BACKEND_DUMMY));
         } else {
             assert(0);
         }
     }
     tq_ = std::make_unique<TaskQueue>();
-    // image_path_ = ;
 
     num_executor_ = scfg_.num_executor;
     num_task_ = scfg_.num_task;
@@ -48,8 +28,7 @@ Session::Session(const std::string& yaml_file) {
     }
 }
 
-//多后端
-/** 
+/**  多后端
 Session::Session(std::vector<BackendType>& types, int num_executor, const std::string& path,
 const std::string& image_path) {
     monitor_ = Monitor::getInstance();
@@ -71,68 +50,6 @@ const std::string& image_path) {
 }
 */
 
-
-/*
-std::vector<uint8_t> helper(const std::string& image_path) {
-    // generate task. resnet50 input preprocess
-    cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
-    assert(!image.empty());
-    cv::Mat resized_image;
-    // cv::resize(image, resized, cv::Size(224,224), 0, 0, cv::INTER_LINEAR);
-    cv::resize(image, resized_image, cv::Size(256, 256));
-    // 裁剪中心区域 224x224，从 (16,16) 开始
-    cv::Rect roi(16, 16, 224, 224);
-    cv::Mat cropped_image = resized_image(roi);
-    // BGR -> RGB
-    cv::Mat rgb_image;
-    cv::cvtColor(cropped_image, rgb_image, cv::COLOR_BGR2RGB);
-    // 转为 float32
-    cv::Mat float_image;
-    rgb_image.convertTo(float_image, CV_32FC3);
-    // 按通道归一化： (val - mean) / std
-    std::vector<float> mean = {123.0f, 117.0f, 104.0f};
-    std::vector<float> std  = {57.0f,  57.0f,  58.0f};
-
-    std::vector<cv::Mat> channels(3);
-    cv::split(float_image, channels); // 分离 R, G, B 通道
-
-    for (int i = 0; i < 3; ++i) {
-        channels[i] = (channels[i] - mean[i]) / std[i];
-    }
-
-    cv::Mat normalized_image;
-    cv::merge(channels, normalized_image); // 仍为 HWC，float32
-
-    // 7. HWC -> CHW，展开成 1x3x224x224
-    std::vector<cv::Mat> chw_channels(3);
-    cv::split(normalized_image, chw_channels); // 每个通道是 224x224
-
-    // 创建 1 x (3x224x224) 的 float32 Mat
-    cv::Mat chw_tensor(1, 3 * 224 * 224, CV_32F);
-
-    for (int i = 0; i < 3; ++i) {
-        std::memcpy(
-            chw_tensor.ptr<float>() + i * 224 * 224,
-            chw_channels[i].ptr<float>(),
-            224 * 224 * sizeof(float)
-        );
-    }
-    
-    // 获取数据指针和总字节数
-    float* float_ptr = chw_tensor.ptr<float>();
-    size_t float_count = 3 * 224 * 224;
-    size_t byte_count = float_count * sizeof(float); // 每个 float 是 4 字节
-
-    // 构造 std::vector<uint8_t>，使用 reinterpret_cast
-    std::vector<uint8_t> tensor_bytes(
-        reinterpret_cast<uint8_t*>(float_ptr),
-        reinterpret_cast<uint8_t*>(float_ptr) + byte_count
-    );
-
-    return tensor_bytes;
-}
-
-*/
 
 SessionOut Session::Run() {
     assert(monitor_ != nullptr);

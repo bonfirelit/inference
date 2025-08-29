@@ -4,6 +4,30 @@
 #include "backend/lynxi.h"
 #include "backend/dummy.h"
 
+class BackendFactory {
+  public:
+    static std::unique_ptr<Backend> createBackend(BackendType type) {
+        switch (type) {
+            case BACKEND_LYNXI: {
+                int cnt;
+                lynGetDeviceCount(&cnt);
+                assert(cnt != 0);
+                int device_id = 0; // hard code
+                auto backend = std::make_unique<Lynxi>(device_id);
+                auto res = backend->init();
+                if (res == FAIL) {
+                  return nullptr;
+                }
+                return backend;
+            }
+            case BACKEND_DUMMY:
+                return std::make_unique<Dummy>();
+            default:
+                return nullptr;
+        }
+    }
+};
+
 class Prop {
   public:
     Prop(BackendType t, int id) : type(t), dev_id(id) {}
@@ -35,8 +59,7 @@ class Monitor {
 
   private:
     Monitor() {
-      Init();
-      
+      init();
     }
     ~Monitor() {
       stop_ = true;
@@ -48,7 +71,7 @@ class Monitor {
     Monitor(const Monitor&) = delete;
     Monitor& operator=(const Monitor&) = delete;
 
-    Result Init(); // 创建backend
+    Result init();
     std::unordered_map<BackendType, std::unique_ptr<Backend>> backends_;
     std::unordered_map<BackendType, Prop> props_;
     std::thread monitor_thread_;

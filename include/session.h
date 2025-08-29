@@ -8,10 +8,6 @@
 #include "util.h"
 #include <any>
 
-/*
-为什么是三重vector？
-第一维代表每个推理任务的输出，而每个推理任务的输出又是多个vector<float>
-*/
 using SessionOut = std::vector<std::vector<std::vector<uint8_t>>>;
 
 using PreprocessFn = std::function<std::vector<uint8_t>(const std::any&)>;
@@ -39,8 +35,6 @@ struct SessionCfg {
 class Session {
   public:
     Session() = default;
-    Session(BackendType type, int num_executor, const std::string& model_path,
-    const std::string& image_path);
     Session(const std::string& yaml_file);
     ~Session() = default;
 
@@ -66,7 +60,4 @@ class Session {
     PreprocessFn preprocess_fn_;
     PostprocessFn postprocess_fn_;
 
-    // For Test
-    Backend* backend_;
-    std::string image_path_;
 };
