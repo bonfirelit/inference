@@ -33,27 +33,27 @@ Result Dummy::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) 
     return SUCCESS;
 }
 
-uint32_t Dummy::loadModel(const std::string &path) {
+int Dummy::loadModel(const std::string &path) {
     INFO_LOG("--Dummy loadModel Start--");
     uint32_t id = 114514;
-    {
-        std::lock_guard<std::mutex> lock(model_lock_);
-        if (info_ != nullptr) {
-            return id;
-        }
-    }
-    size_t batch = 1, output_size = 20, input_size = 20, input_num = 1, output_num = 1;
-    std::vector<std::vector<uint32_t>> ins_dim{{1, 5}};
-    std::vector<std::vector<uint32_t>> outs_dim{{1, 5}};
-    {
-        std::lock_guard<std::mutex> lock(model_lock_);
-        if (info_ != nullptr) {
-            return id;
-        }
-        info_ = std::make_unique<ModelInfo>(batch, input_size, output_size, input_num, output_num, 
-            std::move(ins_dim), std::move(outs_dim));
-    }
-    INFO_LOG("Dummy load model success, id = %d", id);
+    // {
+    //     std::lock_guard<std::mutex> lock(model_lock_);
+    //     if (info_ != nullptr) {
+    //         return id;
+    //     }
+    // }
+    // size_t batch = 1, output_size = 20, input_size = 20, input_num = 1, output_num = 1;
+    // std::vector<std::vector<uint32_t>> ins_dim{{1, 5}};
+    // std::vector<std::vector<uint32_t>> outs_dim{{1, 5}};
+    // {
+    //     std::lock_guard<std::mutex> lock(model_lock_);
+    //     if (info_ != nullptr) {
+    //         return id;
+    //     }
+    //     info_ = std::make_unique<ModelInfo>(batch, input_size, output_size, input_num, output_num, 
+    //         std::move(ins_dim), std::move(outs_dim));
+    // }
+    // INFO_LOG("Dummy load model success, id = %d", id);
     return id;
 }
 
@@ -63,22 +63,24 @@ Result Dummy::unloadModel(const std::string& path) {
     return SUCCESS;
 }
 
-Result Dummy::infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
+std::vector<Tensor> Dummy::infer(Stream* stream, int model_id, std::vector<Tensor>&& inputs) {
+
     // std::lock_guard<std::mutex> lock(model_lock_);
     // if (!info_) {
     //     ERROR_LOG("Dummy infer failed: no model loaded");
     //     return FAIL;
     // }
-    INFO_LOG("--Dummy infer Start--");
-    float* input = static_cast<float*>(dev_input_ptr);
-    float* output = static_cast<float*>(dev_output_ptr);
-    int len = 5;
-    float cons = 1.0;
-    for (int i = 0; i < len; i++) {
-        output[i] = input[i] + cons;
-    }
-    INFO_LOG("Dummy infer success");
-    return SUCCESS;
+    // INFO_LOG("--Dummy infer Start--");
+    // float* input = static_cast<float*>(dev_input_ptr);
+    // float* output = static_cast<float*>(dev_output_ptr);
+    // int len = 5;
+    // float cons = 1.0;
+    // for (int i = 0; i < len; i++) {
+    //     output[i] = input[i] + cons;
+    // }
+    // INFO_LOG("Dummy infer success");
+    // return SUCCESS;
+    return {};
 }
 
 std::unique_ptr<Stream> Dummy::createStream() {
@@ -88,7 +90,7 @@ std::unique_ptr<Stream> Dummy::createStream() {
     return dummy_stream;
 }
 
-const ModelInfo* Dummy::getModelInfo(uint32_t model_id) const {
+const ModelInfo* Dummy::getModelInfo(int model_id) const {
     std::lock_guard<std::mutex> lock(model_lock_);
     INFO_LOG("--Dummy getModelInfo Start--");
     INFO_LOG("Dummy get %d model info", model_id);

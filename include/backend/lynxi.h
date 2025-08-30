@@ -3,6 +3,7 @@
 #include "common.h"
 #include "backend.h"
 #include "model_info.h"
+#include "util.h"
 #include <lyn_api.h>
 #include <lyn_smi.h>
 
@@ -16,10 +17,10 @@ class Lynxi : public Backend {
     Result malloc(void **dev_ptr, uint64_t size) override;
     Result free(void *dev_prt) override;
     Result memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) override;
-    uint32_t loadModel(const std::string &path) override;
+    int loadModel(const std::string &path) override;
     Result unloadModel(const std::string& path) override;
-    Result infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) override;
-    const ModelInfo* getModelInfo(uint32_t model_id) const override;
+    std::vector<Tensor> infer(Stream* stream, int model_id, std::vector<Tensor>&& inputs) override;
+    const ModelInfo* getModelInfo(int model_id) const override;
     
     std::unique_ptr<Stream> createStream() override;
     Result destoryStream(Stream* stream) override;
@@ -27,6 +28,7 @@ class Lynxi : public Backend {
 
   private:
     lynContext_t ctx_{nullptr};
+    DataType convertDataType(lynDataType_t dt);
 
 };
 

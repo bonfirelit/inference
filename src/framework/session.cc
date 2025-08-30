@@ -21,10 +21,9 @@ Session::Session(const std::string& yaml_file) {
     num_task_ = scfg_.num_task;
     model_path_ = scfg_.model_path;
     executors_.reserve(num_executor_);
-    auto output_dtype = stringToDataType(scfg_.outputs[0].dtype);
     for (int i = 0; i < num_executor_; i++) {
         // 暂时先都分配到第一个后端上
-        executors_.emplace_back(std::make_unique<Executor>(model_path_, backends_[0], tq_.get(), i, output_dtype));
+        executors_.emplace_back(std::make_unique<Executor>(model_path_, backends_[0], tq_.get(), i));
     }
 }
 
@@ -68,10 +67,8 @@ SessionOut Session::Run() {
         std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
         auto in_dtype = scfg_.inputs[0].dtype;
         INFO_LOG("The input shape is:");
-        for (auto x : in_shape) {
-            printf("%d ", x);
-        }
-        printf("\n");
+        printVector(in_shape);
+
         Task task{std::vector<Tensor>{{tensor_bytes, in_shape, stringToDataType(in_dtype)}}, 
                 [this](std::vector<Tensor>&& outputs) {
                     outputs_.emplace_back(std::move(outputs));
@@ -89,11 +86,22 @@ SessionOut Session::Run() {
     std::vector<std::thread> threads;
     threads.reserve(num_executor_);
 
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     for (int i = 0; i < num_executor_; i++) {
         threads.emplace_back([this, i]() {
+            auto start_time = std::chrono::high_resolution_clock::now();
+
             auto res = executors_[i]->Execute();
+
+            auto end_time = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> duration = end_time - start_time;
+
             if (res != SUCCESS) {
                 ERROR_LOG("Executor [%d] failed", i);
+            } else {
+                std::cout << "Executor [" << i << "] executed in " 
+                      << duration.count() << " seconds." << std::endl;
             }
         });
     }
@@ -101,13 +109,18 @@ SessionOut Session::Run() {
         t.join();
     }
 
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> total_duration = end_time - start_time;
+
     // TODO:添加计算每个exeutor执行时间的代码
-    INFO_LOG("Session Run over, output size = %ld", outputs_[0].size());
+    // INFO_LOG("Session Run over, output size = %ld", outputs_[0].size());
+    INFO_LOG("Session使用%d个Executor, 耗时%f秒完成%d个任务的推理", num_executor_, total_duration.count(), num_task_);
     // 返回结果
     
     SessionOut ret;
     ret.reserve(outputs_.size());
 
+    // Transform tensors to vector of bytes
     for (auto result : outputs_) {
         // result是一个任务的所有输出张量
         std::vector<std::vector<uint8_t>> task_out;

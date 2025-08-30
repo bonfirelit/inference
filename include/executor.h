@@ -10,7 +10,7 @@
 
 class Executor {
   public:
-    Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id, DataType otype);
+    Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id);
     ~Executor();
     Result Execute();
     
@@ -27,17 +27,16 @@ class Executor {
     const ModelInfo* info_{nullptr};
     std::unique_ptr<Stream> stream_;
     
-    void* dev_input_ptr_{nullptr};
-    void* dev_output_ptr_{nullptr};
-    DataType output_type_; // bad, for now
+    // void* dev_input_ptr_{nullptr};
+    // void* dev_output_ptr_{nullptr};
     
     Result loadModel();
     Result unloadModel();
     Result init();
-    Result run();
+    std::vector<Tensor> run(std::vector<Tensor>&&);
     Result finalize();
-    Result prepareInput(std::vector<Tensor>&&);
-    Result prepareOutput();
+    // Result prepareInput();
+    // Result prepareOutput();
     void destroyBuffers();
-    std::vector<Tensor> getOutput();
+    // std::vector<Tensor> getOutput();
 };

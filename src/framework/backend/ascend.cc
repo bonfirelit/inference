@@ -3,7 +3,7 @@
 Ascend::Ascend(int dev_id) : Backend(BACKEND_ACL, dev_id) {
     auto ret = aclrtSetDevice(dev_id);
     if (ret != ACL_SUCCESS) {
-        ERROR_LOG("ascend set device init failed");
+        ERROR_LOG("ascend set device failed");
     }
 }
 
@@ -66,7 +66,7 @@ Result Ascend::free(void *dev_ptr) {
     return SUCCESS;
 }
 
-uint32_t Ascend::loadModel(const std::string &path) {
+int Ascend::loadModel(const std::string &path) {
     // 判断模型是否已加载
     {
         std::lock_guard<std::mutex> lock(model_lock_);
@@ -95,19 +95,19 @@ uint32_t Ascend::loadModel(const std::string &path) {
         aclmdlDesc *model_desc = aclmdlCreateDesc();
         if (model_desc == nullptr) {
             ERROR_LOG("create model description failed");
-            aclmdlUnload(ascend_model)
+            aclmdlUnload(ascend_model);
             return -1;
         }
         aclError ret = aclmdlGetDesc(model_desc, ascend_model);
         if (ret != ACL_SUCCESS) {
             ERROR_LOG("get model description failed, ascend_model_id is %u, errorCode is %d",
             ascend_model, static_cast<int32_t>(ret));
-            aclmdlUnload(ascend_model)
+            aclmdlUnload(ascend_model);
             return -1;
         }
 
-        // ??????
-        size_t batch_size = model_desc->inputTensorAttrArray->batchSize;
+        // ascend don't need batch size
+        size_t batch_size = 0;
         size_t input_size = 0, output_size = 0;
 
         uint32_t input_num = aclmdlGetNumInputs(model_desc);
@@ -118,6 +118,9 @@ uint32_t Ascend::loadModel(const std::string &path) {
         for (size_t i = 0; i < output_num; i++) {
             output_size += aclmdlGetOutputSizeByIndex(model_desc, i);
         }
+        // 假设多个输入张量的数据类型相同，输出张量也是
+        aclDataType in_type = aclmdlGetInputDataType(model_desc, 0);
+        aclDataType out_type = aclmdlGetOutputDataType(model_desc, 0);
 
         std::vector<std::vector<uint32_t>> outs_dim;
         for (int i = 0; i < output_num; i++) {
@@ -143,7 +146,7 @@ uint32_t Ascend::loadModel(const std::string &path) {
         }
 
         path_to_id_[path] = model_id;
-        models_[model_id] = std::make_unique<AscendModel>(this, ascend_model_id);
+        models_[model_id] = std::make_unique<AscendModel>(this, ascend_model);
         infos_[model_id] = std::make_unique<ModelInfo>(
             batch_size,
             input_size,
@@ -151,8 +154,12 @@ uint32_t Ascend::loadModel(const std::string &path) {
             input_num,
             output_num,
             std::move(ins_dim),
-            std::move(outs_dim)
+            std::move(outs_dim),
+            this->convertDataType(in_type),
+            this->convertDataType(out_type)
         );
+
+        aclmdlDestroyDesc(model_desc);
 
         return model_id;
     }
@@ -168,10 +175,10 @@ Result Ascend::unloadModel(const std::string& path) {
         uint32_t model_id = path_to_id_[path];
         auto it = models_.find(model_id);
         if (it == models_.end()) {
-            ERROR_LOG("未找到模型句柄,unload失败");
+            ERROR_LOG("ascend unload failed");
             return FAIL;
         }
-        ascend_model = (uint32_t)it->second->getHandle();
+        ascend_model = *(uint32_t*)it->second->getHandle();
 
         path_to_id_.erase(path);
         models_.erase(model_id);
@@ -194,55 +201,126 @@ Result Ascend::unloadModel(const std::string& path) {
  *  aclrtSynchronizeStream(stream2);
  * 对于多个executor，会出错，lynxi那边可能也一样
  */
-Result Ascend::infer(Stream* stream, uint32_t model_id, std::vector<Tensor>&& inputs) {
+std::vector<Tensor> Ascend::infer(Stream* stream, int model_id, std::vector<Tensor>&& inputs) {
     aclrtStream aclstream = stream->getStream();
     uint32_t model;
     uint32_t input_num, output_num;
+    std::vector<std::vector<uint32_t>> output_shapes;
+    DataType output_type;
+
     {
         std::lock_guard<std::mutex> lock(model_lock_);
         auto it_model = models_.find(model_id);
         auto it_info  = infos_.find(model_id);
         if (it_model == models_.end() || it_info == infos_.end()) {
-            ERROR_LOG("model or model_info doesn't exist");
-            return FAIL;
+            ERROR_LOG("ascend infer(): model or model_info doesn't exist");
+            return {};
         }
         model = *(uint32_t*)it_model->second->getHandle();
         input_num = it_info->second->getInputNum();
         output_num = it_info->second->getOutputNum();
+        output_shapes = it_info->second->getOutputsShape();
+        output_type = it_info->second->getOutputType();
     }
     assert(input_num == inputs.size());
+    assert(output_shapes.size() == output_num);
+
+    aclmdlDesc *model_desc = aclmdlCreateDesc();
+    if (model_desc == nullptr) {
+        ERROR_LOG("create model description failed");
+        return {};
+    }
+    aclError ret = aclmdlGetDesc(model_desc, model);
+    if (ret != ACL_SUCCESS) {
+        ERROR_LOG("get model description failed, ascend_model_id is %u, errorCode is %d",
+        model, static_cast<int32_t>(ret));
+        return {};
+    }
 
     // Prepare input
-    aclmdlDataset input;
-    input = aclmdlCreateDataset();
+    INFO_LOG("ascend infer(): prepare input start");
+    aclmdlDataset* input = aclmdlCreateDataset();
     for (size_t i = 0; i < input_num; i++) {
         void* input_buffer = nullptr;
-        size_t input_size = aclmdlGetInputSizeByIndex(modelDesc_, i);
+        size_t input_size = aclmdlGetInputSizeByIndex(model_desc, i);
         assert(input_size == inputs[i].size());
+        // malloc on device
         this->malloc(&input_buffer, input_size);
+        // copy to device
         this->memcopy(input_buffer, inputs[i].data(), input_size, DEVICE2HOST);
         aclDataBuffer *input_data = aclCreateDataBuffer(input_buffer, input_size);
-        aclmdlAddDatasetBuffer(&input, input_data);
+        aclmdlAddDatasetBuffer(input, input_data);
     }
 
     // Prepare output
-    aclmdlDataset output;
-    output = aclmdlCreateDataset();
+    INFO_LOG("ascend infer(): prepare output start");
+    aclmdlDataset* output = aclmdlCreateDataset();
     for (size_t i = 0; i < output_num; i++) {
         void* output_buffer = nullptr;
-        size_t output_size = aclmdlGetOutputSizeByIndex(modelDesc_, i);
+        size_t output_size = aclmdlGetOutputSizeByIndex(model_desc, i);
+        // malloc on device
         this->malloc(&output_buffer, output_size);
         aclDataBuffer *output_data = aclCreateDataBuffer(output_buffer, output_size);
-        aclmdlAddDatasetBuffer(&output, output_data);
+        aclmdlAddDatasetBuffer(output, output_data);
     }
-    
 
-    aclmdlExecuteAsync(model, &input, &output, aclstream);
+    INFO_LOG("ascend infer(): model inference start");
+    aclmdlExecuteAsync(model, input, output, aclstream);
     aclrtSynchronizeStream(aclstream);
-    return SUCCESS;
+
+    // Copy to host
+    INFO_LOG("ascend infer(): copy output to host start");
+    std::vector<Tensor> ret_tensor;
+    ret_tensor.reserve(output_num);
+    for (size_t i = 0; i < aclmdlGetDatasetNumBuffers(output); i++) {
+        aclDataBuffer* dataBuffer = aclmdlGetDatasetBuffer(output, i);
+        void* device_data = aclGetDataBufferAddr(dataBuffer);
+        size_t len = aclGetDataBufferSizeV2(dataBuffer);
+        ret_tensor.emplace_back(output_shapes[i], output_type);
+        Tensor& tensor = ret_tensor.back();
+        size_t output_size = getElementSize(output_type) * std::accumulate(
+            output_shapes[i].begin(), output_shapes[i].end(), 1u, std::multiplies<uint32_t>()
+            );
+        assert(tensor.size() == output_size);
+        assert(len == output_size);
+        assert(tensor.data() != nullptr);
+        auto err = this->memcopy(
+            tensor.data(),
+            device_data,
+            output_size,
+            DEVICE2HOST
+        );
+        if (err != SUCCESS) {
+            ERROR_LOG("ascend infer(): copy to host failed");
+            return {};
+        }
+    }
+
+    // free device mem
+    INFO_LOG("ascend infer(): free device mem start");
+    for (size_t i = 0; i < aclmdlGetDatasetNumBuffers(input); ++i) {
+        aclDataBuffer *dataBuffer = aclmdlGetDatasetBuffer(input, i);
+        void* device_data = aclGetDataBufferAddr(dataBuffer);
+        this->free(device_data);
+        (void)aclDestroyDataBuffer(dataBuffer);
+    }
+    (void)aclmdlDestroyDataset(input);
+    input = nullptr;
+
+    for (size_t i = 0; i < aclmdlGetDatasetNumBuffers(output); ++i) {
+        aclDataBuffer *dataBuffer = aclmdlGetDatasetBuffer(output, i);
+        void* device_data = aclGetDataBufferAddr(dataBuffer);
+        this->free(device_data);
+        (void)aclDestroyDataBuffer(dataBuffer);
+    }
+    (void)aclmdlDestroyDataset(output);
+    output = nullptr;
+
+
+    return ret_tensor;
 }
 
-const ModelInfo* Ascend::getModelInfo(uint32_t model_id) const {
+const ModelInfo* Ascend::getModelInfo(int model_id) const {
     std::lock_guard<std::mutex> lock(model_lock_);
     auto it = infos_.find(model_id);
     if (it == infos_.end()) {
@@ -350,4 +428,14 @@ Result AscendEvent::synchronize() {
 
 void* AscendEvent::getEvent() {
     return event_;
+}
+
+DataType Ascend::convertDataType(aclDataType dt) {
+    switch (dt) {
+        case ACL_FLOAT:    return FLOAT32;
+        case ACL_FLOAT16:  return FLOAT16;
+        case ACL_INT8:     return INT8;
+        case ACL_UINT8:    return UINT8;
+        default:           return UNKNOWN;
+    }
 }

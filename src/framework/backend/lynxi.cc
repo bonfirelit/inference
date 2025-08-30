@@ -14,7 +14,7 @@ Result Lynxi::init() {
     }
     lynError_t err = lynCreateContext(&ctx_, device_id_);
     if (err != 0) {
-        ERROR_LOG("lynxi创建ctx失败,设备id为%d", device_id_);
+        ERROR_LOG("lynxi create context failed, id[%d]", device_id_);
         return FAIL;
     }
     return SUCCESS;
@@ -23,7 +23,7 @@ Result Lynxi::init() {
 Result Lynxi::finalize() {
     auto err = lynDestroyContext(ctx_);
     if (err != 0) {
-        ERROR_LOG("lynxi销毁ctx失败");
+        ERROR_LOG("lynxi destory context failed");
         return FAIL;
     }
     return SUCCESS;
@@ -36,11 +36,11 @@ Result Lynxi::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) 
     } else if (dir == HOST2DEVICE) {
         err = lynMemcpy(dst, src, size, ClientToServer);
     } else {
-        ERROR_LOG("未知的内存拷贝方向");
+        ERROR_LOG("unkown copy direction");
         return FAIL;
     }
     if (err != 0) {
-        ERROR_LOG("内存拷贝失败");
+        ERROR_LOG("lynxi memcpy failed");
         return FAIL;
     }
     return SUCCESS;
@@ -49,7 +49,7 @@ Result Lynxi::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) 
 Result Lynxi::malloc(void **dev_ptr, uint64_t size) {
     lynError_t err = lynMalloc(dev_ptr, size);
     if (err != 0) {
-        ERROR_LOG("lynxi: 分配内存失败");
+        ERROR_LOG("lynxi malloc failed");
         dev_ptr = nullptr;
         return FAIL;
     }
@@ -59,14 +59,14 @@ Result Lynxi::malloc(void **dev_ptr, uint64_t size) {
 Result Lynxi::free(void *dev_ptr) {
     lynError_t err = lynFree(dev_ptr);
     if (err != 0) {
-        ERROR_LOG("lynxi: 释放内存失败");
+        ERROR_LOG("lynxi free failed");
         return FAIL;
     }
     return SUCCESS;
 }
 
 // 加载模型，同时创建modelinfo，返回model_id
-uint32_t Lynxi::loadModel(const std::string &path) {
+int Lynxi::loadModel(const std::string &path) {
 
     // 判断模型是否已加载
     {
@@ -80,7 +80,7 @@ uint32_t Lynxi::loadModel(const std::string &path) {
     lynModel_t model;
     lynError_t err = lynLoadModel(path.c_str(), &model); // loadModel是线程安全吗
     if (err != 0) {
-        ERROR_LOG("lynxi: 加载模型错误");
+        ERROR_LOG("lynxi load model failed");
         return -1;
     }
 
@@ -98,7 +98,7 @@ uint32_t Lynxi::loadModel(const std::string &path) {
         err = lynModelGetDesc(model, &model_desc);
         if (err != 0) {
             lynUnloadModel(model);
-            ERROR_LOG("lynxi: 获取modelDesc失败");
+            ERROR_LOG("lynxi get model desc failed");
             return -1;
         }
         assert(model_desc->inputDataLen != 0);
@@ -107,10 +107,14 @@ uint32_t Lynxi::loadModel(const std::string &path) {
         size_t batch_size = model_desc->inputTensorAttrArray->batchSize;
         size_t input_size, output_size;
         uint32_t input_num, output_num;
+        lynDataType_t in_type, out_type;
         lynModelGetInputDataTotalLen(model, &input_size);
         lynModelGetOutputDataTotalLen(model, &output_size);
         lynModelGetOutputTensorNum(model, &output_num);
         lynModelGetInputTensorNum(model, &input_num);
+        // 假设多个输入张量的数据类型相同，输出张量也是
+        lynModelGetInputTensorDataTypeByIndex(model, 0, &in_type);
+        lynModelGetOutputTensorDataTypeByIndex(model, 0, &out_type);
         
         std::vector<std::vector<uint32_t>> outs_dim;
         for (int i = 0; i < output_num; i++) {
@@ -138,7 +142,9 @@ uint32_t Lynxi::loadModel(const std::string &path) {
             input_num,
             output_num,
             std::move(ins_dim),
-            std::move(outs_dim)
+            std::move(outs_dim),
+            this->convertDataType(in_type),
+            this->convertDataType(out_type)
         );
 
         return model_id;
@@ -155,7 +161,7 @@ Result Lynxi::unloadModel(const std::string& path) {
         int model_id = path_to_id_[path];
         auto it = models_.find(model_id);
         if (it == models_.end()) {
-            ERROR_LOG("未找到模型句柄,unload失败");
+            ERROR_LOG("can't find model, unload failed");
             return FAIL;
         }
         model = (lynModel_t)it->second->getHandle();
@@ -166,39 +172,115 @@ Result Lynxi::unloadModel(const std::string& path) {
     }
     auto err = lynUnloadModel(model);
     if (err != 0) {
-        ERROR_LOG("lynxi: 卸载模型失败");
+        ERROR_LOG("lynxi unloadmodel failed");
         return FAIL;
     }
     return SUCCESS;
 }
 
-Result Lynxi::infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) {
+std::vector<Tensor> Lynxi::infer(Stream* stream, int model_id, std::vector<Tensor>&& inputs) {
     lynStream_t lynstream = stream->getStream();
     lynModel_t model;
     size_t batch_size;
+    uint32_t input_num, output_num;
+    size_t batch_input_size, batch_output_size;
+    std::vector<std::vector<uint32_t>> shapes;
+    DataType output_type;
 
     {
         std::lock_guard<std::mutex> lock(model_lock_);
         auto it_model = models_.find(model_id);
         auto it_info  = infos_.find(model_id);
         if (it_model == models_.end() || it_info == infos_.end()) {
-            ERROR_LOG("model或model_info不存在");
-            return FAIL;
+            ERROR_LOG("lynxi infer(): model or model_info doesn't exist");
+            return {};
         }
         model = (lynModel_t)it_model->second->getHandle();
         batch_size = it_info->second->getBatchSize();
+        input_num = it_info->second->getInputNum();
+        output_num = it_info->second->getOutputNum();
+        batch_input_size = it_info->second->getInputSize();
+        batch_output_size = it_info->second->getOutputSize();
+        shapes = it_info->second->getOutputsShape();
+        output_type = it_info->second->getOutputType();
+    }
+    assert(input_num == inputs.size());
+
+    // Prepare Input
+    INFO_LOG("lynxi infer(): prepare input start");
+    size_t input_size = 0;
+    for (auto& tensor : inputs) {
+        input_size += tensor.size();
+    }
+    size_t model_input_size = batch_size * batch_input_size;
+    if (input_size != model_input_size) {
+        ERROR_LOG("lynxi infer(): input size[%zu] does not match model input size[%zu]", 
+                    input_size, model_input_size);
+        return {};
+    }
+    void* dev_input_ptr = nullptr;
+    this->malloc((void**)&dev_input_ptr, input_size);
+    assert(dev_input_ptr != nullptr);
+
+    auto temp = static_cast<char*>(dev_input_ptr);
+    for (auto& tensor : inputs) {
+        auto size = tensor.size();
+        this->memcopy(temp, tensor.data(), size, HOST2DEVICE);
+        temp += size;
     }
 
+    // Prepare Output
+    INFO_LOG("lynxi infer(): prepare output start");
+    void* dev_output_ptr = nullptr;
+    size_t model_output_size = batch_size * batch_output_size;
+    this->malloc((void**)&dev_output_ptr, model_output_size);
+    assert(dev_output_ptr != nullptr);
+
+    INFO_LOG("lynxi infer(): model inference start");
     lynExecuteModelAsync(lynstream, model, dev_input_ptr, dev_output_ptr, batch_size);
     lynSynchronizeStream(lynstream);
-    return SUCCESS;
+
+    // Copy to host
+    INFO_LOG("lynxi infer(): copy to host start");
+    std::vector<Tensor> outputs;
+    outputs.reserve(output_num);
+    assert(shapes.size() == output_num);
+    auto dev_out_ptr = static_cast<const char*>(dev_output_ptr);
+    for (int i = 0; i < output_num; i++) {
+        outputs.emplace_back(shapes[i], output_type);
+        Tensor& tensor = outputs.back();
+        size_t output_size = getElementSize(output_type) * std::accumulate(
+            shapes[i].begin(), shapes[i].end(), 1u, std::multiplies<uint32_t>()
+            );
+        assert(tensor.size() == output_size);
+        assert(tensor.data() != nullptr);
+        auto err = this->memcopy(
+            tensor.data(),
+            dev_out_ptr + i * output_size,
+            output_size,
+            DEVICE2HOST
+        );
+        if (err != SUCCESS) {
+            ERROR_LOG("lynxi infer(): copy to host failed");
+            return {};
+        }
+    }
+
+    // free device mem
+    INFO_LOG("lynxi infer(): free device mem start");
+    this->free(dev_input_ptr);
+    this->free(dev_output_ptr);
+
+    return outputs;
 }
 
-const ModelInfo* Lynxi::getModelInfo(uint32_t model_id) const {
+
+
+const ModelInfo* Lynxi::getModelInfo(int model_id) const {
     std::lock_guard<std::mutex> lock(model_lock_);
     auto it = infos_.find(model_id);
     if (it == infos_.end()) {
-        ERROR_LOG("ModelInfo不存在");
+        ERROR_LOG("ModelInfo doesn't exist");
         return nullptr;
     }
     return it->second.get();
@@ -302,4 +384,14 @@ Result LynxiEvent::synchronize() {
 
 void* LynxiEvent::getEvent() {
     return event_;
+}
+
+DataType Lynxi::convertDataType(lynDataType_t dt) {
+    switch (dt) {
+        case DT_FLOAT:   return FLOAT32;
+        case DT_INT8:    return INT8;
+        case DT_UINT8:   return UINT8;
+        case DT_FLOAT16: return FLOAT16;
+        default:         return UNKNOWN;
+    }
 }

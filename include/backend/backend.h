@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "tensor.h"
 
 class ModelInfo;
 class Stream;
@@ -19,10 +20,10 @@ class Backend {
     virtual Result malloc(void **dev_ptr, size_t size) = 0;
     virtual Result free(void *dev_ptr) = 0;
     virtual Result memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) = 0;
-    virtual uint32_t loadModel(const std::string &path) = 0;
+    virtual int loadModel(const std::string &path) = 0;
     virtual Result unloadModel(const std::string& path) = 0;
-    virtual Result infer(Stream* stream, uint32_t model_id, void* dev_input_ptr, void* dev_output_ptr) = 0;
-    virtual const ModelInfo* getModelInfo(uint32_t model_id) const = 0;
+    virtual std::vector<Tensor> infer(Stream* stream, int model_id, std::vector<Tensor>&& inputs) = 0;
+    virtual const ModelInfo* getModelInfo(int model_id) const = 0;
 
     virtual std::unique_ptr<Stream> createStream() = 0;
     virtual Result destoryStream(Stream* stream) = 0;
@@ -35,13 +36,13 @@ class Backend {
     /**
      * 在这个后端上已加载的模型的个数
      */
-    uint32_t next_model_id_{0};
+    int next_model_id_{0};
 
     mutable std::mutex model_lock_;
 
-    std::unordered_map<std::string, uint32_t> path_to_id_;
-    std::unordered_map<uint32_t, std::unique_ptr<Model>> models_;
-    std::unordered_map<uint32_t, std::unique_ptr<ModelInfo>> infos_;
+    std::unordered_map<std::string, int> path_to_id_;
+    std::unordered_map<int, std::unique_ptr<Model>> models_;
+    std::unordered_map<int, std::unique_ptr<ModelInfo>> infos_;
 };
 
 class Model {

@@ -2,12 +2,11 @@
 
 // 要保证调用构造函数时，backend_type一定是合法的
 // 入参的backend指针代表该执行器在这个后端上运行
-Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id, DataType otype) 
+Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id) 
     : backend_(backend)
     , model_path_(model_path)
     , tq_(tq)
-    , id_(id)
-    , output_type_(otype) {
+    , id_(id) {
         INFO_LOG("executor[%d] created!", id_);
     }
 
@@ -22,20 +21,16 @@ Result Executor::Execute() {
     RETURN_IF_ERR(loadModel(), "Exeuctor load model fail");
     Task task{};
     while (tq_->pop(task)) {
-        // 分配设备内存
-        INFO_LOG("Executor[%d] PrepareInput", id_);
-        RETURN_IF_ERR(prepareInput(std::move(task.inputs)), "Executor failed to prepare input");
-        INFO_LOG("Executor[%d] PrepareOutput", id_);
-        RETURN_IF_ERR(prepareOutput(), "Executor fail to prepare output");
         // 执行
         INFO_LOG("Executor[%d] Run", id_);
-        RETURN_IF_ERR(run(), "Executor run fail");
+        // RETURN_IF_ERR(run(std::move(task.inputs)), "Executor run fail");
+        task.cb(run(std::move(task.inputs)));
         // 回调函数将结果传输至session
-        INFO_LOG("Executor[%d] GetOutput", id_);
-        task.cb(getOutput());
+        // INFO_LOG("Executor[%d] GetOutput", id_);
+        // task.cb(getOutput());
         // 释放设备内存
-        INFO_LOG("Executor[%d] start to free buffer", id_);
-        destroyBuffers();
+        // INFO_LOG("Executor[%d] start to free buffer", id_);
+        // destroyBuffers();
     }
     RETURN_IF_ERR(unloadModel(), "Executor unload model fail");
     RETURN_IF_ERR(finalize(), "Executor finalize fail");
@@ -46,7 +41,7 @@ Result Executor::Execute() {
 Result Executor::init() {
     stream_ = backend_->createStream();
     if (stream_->getStream() == nullptr) {
-        ERROR_LOG("IT'S NULL PTR!!!!!!!!!!!!!!!!!!");
+        ERROR_LOG("executor get stream failed");
         return FAIL;
     }
     return SUCCESS;
@@ -61,7 +56,7 @@ Result Executor::loadModel() {
     assert(model_id_ != -1);
     info_ = backend_->getModelInfo(model_id_);
     if (!info_) {
-        ERROR_LOG("执行器获取ModelInfo失败");
+        ERROR_LOG("executor get model info failed");
         return FAIL;
     }
     return SUCCESS;
@@ -73,6 +68,7 @@ Result Executor::unloadModel() {
 }
 
 // 在设备上分配内存并转移数据
+/*
 Result Executor::prepareInput(std::vector<Tensor>&& inputs) {
     assert(info_ != nullptr);
 
@@ -104,53 +100,56 @@ Result Executor::prepareInput(std::vector<Tensor>&& inputs) {
     }
     return SUCCESS;
 }
+*/
 
+/*
 Result Executor::prepareOutput() {
     size_t model_output_size = info_->getBatchSize() * info_->getOutputSize();
     backend_->malloc((void**)&dev_output_ptr_, model_output_size);
     assert(dev_output_ptr_ != nullptr);
     return SUCCESS;
 }
+*/
 
 // 同步接口
-Result Executor::run() {
-    return backend_->infer(stream_.get(), model_id_, dev_input_ptr_, dev_output_ptr_);
+std::vector<Tensor> Executor::run(std::vector<Tensor>&& inputs) {
+    return backend_->infer(stream_.get(), model_id_, std::move(inputs));
 }
 
 // 将输出数据搬回主机
-std::vector<Tensor> Executor::getOutput() {
-    auto output_num = info_->getOutputNum();
-    std::vector<Tensor> outputs;
-    outputs.reserve(output_num);
+// std::vector<Tensor> Executor::getOutput() {
+//     auto output_num = info_->getOutputNum();
+//     std::vector<Tensor> outputs;
+//     outputs.reserve(output_num);
 
-    auto shapes = info_->getOutputsShape();
-    assert(shapes.size() == output_num);
+//     auto shapes = info_->getOutputsShape();
+//     assert(shapes.size() == output_num);
 
-    auto dev_out_ptr = static_cast<const char*>(dev_output_ptr_);
-    for (int i = 0; i < output_num; i++) {
-        INFO_LOG("Executor is get number %d output tensor", i);
-        outputs.emplace_back(shapes[i], output_type_);
-        Tensor& tensor = outputs.back();
-        size_t output_size = getElementSize(output_type_) * std::accumulate(
-          shapes[i].begin(), shapes[i].end(), 1u, std::multiplies<uint32_t>()
-          );
-        assert(tensor.size() == output_size);
-        assert(tensor.data() != nullptr);
-        auto err = backend_->memcopy(
-            tensor.data(),
-            dev_out_ptr + i * output_size,
-            output_size,
-            DEVICE2HOST
-        );
-        if (err != SUCCESS) {
-            ERROR_LOG("Executor Getoutput fail");
-            return {};
-        }
-    }
-    return outputs;
-}
+//     auto dev_out_ptr = static_cast<const char*>(dev_output_ptr_);
+//     for (int i = 0; i < output_num; i++) {
+//         INFO_LOG("Executor is get number %d output tensor", i);
+//         outputs.emplace_back(shapes[i], output_type_);
+//         Tensor& tensor = outputs.back();
+//         size_t output_size = getElementSize(output_type_) * std::accumulate(
+//           shapes[i].begin(), shapes[i].end(), 1u, std::multiplies<uint32_t>()
+//           );
+//         assert(tensor.size() == output_size);
+//         assert(tensor.data() != nullptr);
+//         auto err = backend_->memcopy(
+//             tensor.data(),
+//             dev_out_ptr + i * output_size,
+//             output_size,
+//             DEVICE2HOST
+//         );
+//         if (err != SUCCESS) {
+//             ERROR_LOG("Executor Getoutput fail");
+//             return {};
+//         }
+//     }
+//     return outputs;
+// }
 
-void Executor::destroyBuffers() {
-    backend_->free(dev_input_ptr_);
-    backend_->free(dev_output_ptr_);
-}
+// void Executor::destroyBuffers() {
+//     backend_->free(dev_input_ptr_);
+//     backend_->free(dev_output_ptr_);
+// }

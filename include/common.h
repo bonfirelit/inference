@@ -40,6 +40,7 @@ enum DataType {
   INT8,
   UINT8,
   FLOAT16,
+  UNKNOWN,
 };
 
 enum Result {
