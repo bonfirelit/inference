@@ -51,7 +51,8 @@ enum BackendType {
     BACKEND_UNKNOWN,
     BACKEND_DUMMY,
     BACKEND_LYNXI,
-    BAKCEND_CPU,
+    BACKEND_CPU,
+    BACKEND_ACL,
 };
 
 enum DIRECTION {

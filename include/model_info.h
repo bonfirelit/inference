@@ -43,7 +43,13 @@ class ModelInfo {
 
   private:
     size_t batch_size_;
+    /**
+     * 模型一个batch的输出大小字节数
+     */
     size_t output_size_;
+    /**
+     * 模型一个batch的输入大小字节数
+     */
     size_t input_size_;
     uint32_t input_num_;
     uint32_t output_num_;

@@ -19,6 +19,9 @@ class Executor {
     Backend* backend_;
     std::string model_path_;
     TaskQueue* tq_;
+    /**
+     * executor要执行的模型
+     */
     uint32_t model_id_{0};
     
     const ModelInfo* info_{nullptr};

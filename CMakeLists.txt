@@ -20,6 +20,7 @@ target_link_directories(inference
         ${CMAKE_SOURCE_DIR}/3rd_party/opencv/lib
         ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/lib
         ${CMAKE_SOURCE_DIR}/3rd_party/yaml/lib/arm
+        ${CMAKE_SOURCE_DIR}/3rd_party/ascend/lib
 )
 
 if(EXISTS "/usr/local/lynxi/sdk/libs")
@@ -42,6 +43,7 @@ target_include_directories(inference
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
     ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
+    ${CMAKE_SOURCE_DIR}/3rd_party/ascend/include
     ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
 )
 

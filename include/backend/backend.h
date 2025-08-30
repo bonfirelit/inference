@@ -31,8 +31,11 @@ class Backend {
 
   protected:
     int device_id_;
-    uint32_t next_model_id_{0};
     BackendType type_;
+    /**
+     * 在这个后端上已加载的模型的个数
+     */
+    uint32_t next_model_id_{0};
 
     mutable std::mutex model_lock_;
 
