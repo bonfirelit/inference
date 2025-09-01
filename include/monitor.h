@@ -2,6 +2,7 @@
 #include "common.h"
 #include "backend/backend.h"
 #include "backend/lynxi.h"
+#include "backend/ascend.h"
 #include "backend/dummy.h"
 
 class BackendFactory {
@@ -9,7 +10,7 @@ class BackendFactory {
     static std::unique_ptr<Backend> createBackend(BackendType type) {
         switch (type) {
             case BACKEND_LYNXI: {
-                int cnt;
+                int cnt = 0;
                 lynGetDeviceCount(&cnt);
                 assert(cnt != 0);
                 int device_id = 0; // 如支持同种类型的多个设备，这里需要改
@@ -20,6 +21,15 @@ class BackendFactory {
                 }
                 return backend;
             }
+            // case BACKEND_ACL: {
+            //     int device_id = 0;
+            //     auto backend = std::make_unique<Ascend>(device_id);
+            //     auto res = backend->init();
+            //     if (res == FAIL) {
+            //       return nullptr;
+            //     }
+            //     return backend;
+            // }
             case BACKEND_DUMMY:
                 return std::make_unique<Dummy>();
             default:
@@ -69,6 +79,7 @@ class Monitor {
       for (auto& [_, backend] : backends_) {
         backend->finalize();
       }
+      INFO_LOG("monitor destructor success");
     }
 
     Monitor(const Monitor&) = delete;

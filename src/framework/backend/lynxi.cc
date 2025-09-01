@@ -12,7 +12,9 @@ Result Lynxi::init() {
     if (ctx_ != nullptr) { // 该backend已经初始化过了
         return SUCCESS;
     }
+    assert(ctx_ == nullptr);
     lynError_t err = lynCreateContext(&ctx_, device_id_);
+    assert(ctx_ != nullptr);
     if (err != 0) {
         ERROR_LOG("lynxi create context failed, id[%d]", device_id_);
         return FAIL;
@@ -21,11 +23,18 @@ Result Lynxi::init() {
 }
 
 Result Lynxi::finalize() {
+    INFO_LOG("lynxi backend finalize start");
+    if (ctx_ == nullptr) {
+        INFO_LOG("lynxi backend finalize: ctx_ is null, skip");
+        return SUCCESS;
+    }
     auto err = lynDestroyContext(ctx_);
     if (err != 0) {
         ERROR_LOG("lynxi destory context failed");
         return FAIL;
     }
+    ctx_ = nullptr;
+    INFO_LOG("lynxi backend finalize end");
     return SUCCESS;
 }
 
@@ -330,6 +339,7 @@ Result LynxiStream::destoryStream() {
         ERROR_LOG("lynxi destory stream failed!");
         return FAIL;
     }
+    stream_ = nullptr;
     return SUCCESS;
 }
 
@@ -370,6 +380,7 @@ Result LynxiEvent::destoryEvent() {
         ERROR_LOG("lynxi destory event failed!");
         return FAIL;
     }
+    event_ = nullptr;
     return SUCCESS;
 }
 

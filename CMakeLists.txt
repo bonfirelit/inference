@@ -80,23 +80,26 @@ target_include_directories(inference
     PUBLIC
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
+        ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
         ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
+        ${CMAKE_SOURCE_DIR}/3rd_party/acl/include
+
 )
 
-if(LYNXI)
-    target_include_directories(inference PUBLIC
-        ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
-    )
-    if(EXISTS "/usr/local/lynxi/sdk/include")
-        target_include_directories(inference PUBLIC /usr/local/lynxi/sdk/include)
-    endif()
-endif()
+# if(LYNXI)
+#     target_include_directories(inference PUBLIC
+#         ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
+#     )
+#     if(EXISTS "/usr/local/lynxi/sdk/include")
+#         target_include_directories(inference PUBLIC /usr/local/lynxi/sdk/include)
+#     endif()
+# endif()
 
-if(ACL)
-    target_include_directories(inference PUBLIC
-        ${CMAKE_SOURCE_DIR}/3rd_party/acl/include
-    )
-endif()
+# if(ACL)
+#     target_include_directories(inference PUBLIC
+#         ${CMAKE_SOURCE_DIR}/3rd_party/acl/include
+#     )
+# endif()
 
 
 set(APP_SRCS

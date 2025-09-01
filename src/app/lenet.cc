@@ -39,4 +39,5 @@ int main() {
             printVector(bytesToUint16(task_out));
         }
     }
+    return 0;
 }

@@ -72,4 +72,5 @@ int main() {
             printVector(top5Indices(bytesToFloat32(task_out)));
         }
     }
+    return 0;
 }

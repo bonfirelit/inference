@@ -1,7 +1,7 @@
 #include "backend/ascend.h"
 
 Ascend::Ascend(int dev_id) : Backend(BACKEND_ACL, dev_id) {
-    aclError ret = aclInit(aclConfigPath);
+    aclError ret = aclInit(nullptr);
     if (ret != ACL_SUCCESS) {
         ERROR_LOG("ascend init failed");
     }
