@@ -1,13 +1,26 @@
 #include "backend/ascend.h"
 
 Ascend::Ascend(int dev_id) : Backend(BACKEND_ACL, dev_id) {
-    auto ret = aclrtSetDevice(dev_id);
+    aclError ret = aclInit(aclConfigPath);
+    if (ret != ACL_SUCCESS) {
+        ERROR_LOG("ascend init failed");
+    }
+    ret = aclrtSetDevice(dev_id);
     if (ret != ACL_SUCCESS) {
         ERROR_LOG("ascend set device failed");
     }
 }
 
-Ascend::~Ascend() {}
+Ascend::~Ascend() {
+    auto ret = aclrtResetDevice(device_id_);
+    if (ret != ACL_SUCCESS){
+        ERROR_LOG("ascend reset device failed");
+    }
+    ret = aclFinalize();
+    if (ret != ACL_SUCCESS){
+        ERROR_LOG("ascend finalize failed");
+    }
+}
 
 Result Ascend::init() {
     if (ctx_ != nullptr) {

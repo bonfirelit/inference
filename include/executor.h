@@ -27,16 +27,9 @@ class Executor {
     const ModelInfo* info_{nullptr};
     std::unique_ptr<Stream> stream_;
     
-    // void* dev_input_ptr_{nullptr};
-    // void* dev_output_ptr_{nullptr};
-    
     Result loadModel();
     Result unloadModel();
     Result init();
     std::vector<Tensor> run(std::vector<Tensor>&&);
     Result finalize();
-    // Result prepareInput();
-    // Result prepareOutput();
-    void destroyBuffers();
-    // std::vector<Tensor> getOutput();
 };

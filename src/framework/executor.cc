@@ -1,7 +1,5 @@
 #include "executor.h"
 
-// 要保证调用构造函数时，backend_type一定是合法的
-// 入参的backend指针代表该执行器在这个后端上运行
 Executor::Executor(const std::string& model_path, Backend* backend, TaskQueue* tq, int id) 
     : backend_(backend)
     , model_path_(model_path)
@@ -15,22 +13,13 @@ Executor::~Executor() {
 }
 
 Result Executor::Execute() {
-    INFO_LOG("Executor[%d] Init", id_);
     RETURN_IF_ERR(init(), "Executor init fail");
     INFO_LOG("Executor[%d] loadModel", id_);
     RETURN_IF_ERR(loadModel(), "Exeuctor load model fail");
     Task task{};
     while (tq_->pop(task)) {
         // 执行
-        INFO_LOG("Executor[%d] Run", id_);
-        // RETURN_IF_ERR(run(std::move(task.inputs)), "Executor run fail");
         task.cb(run(std::move(task.inputs)));
-        // 回调函数将结果传输至session
-        // INFO_LOG("Executor[%d] GetOutput", id_);
-        // task.cb(getOutput());
-        // 释放设备内存
-        // INFO_LOG("Executor[%d] start to free buffer", id_);
-        // destroyBuffers();
     }
     RETURN_IF_ERR(unloadModel(), "Executor unload model fail");
     RETURN_IF_ERR(finalize(), "Executor finalize fail");
@@ -39,6 +28,7 @@ Result Executor::Execute() {
 
 // 这里的初始化为在后端上初始化运行时资源
 Result Executor::init() {
+    INFO_LOG("Executor[%d] create stream start", id_);
     stream_ = backend_->createStream();
     if (stream_->getStream() == nullptr) {
         ERROR_LOG("executor get stream failed");
@@ -48,6 +38,7 @@ Result Executor::init() {
 }
 
 Result Executor::finalize() {
+    INFO_LOG("Executor[%d] destory stream start", id_);
     return backend_->destoryStream(stream_.get());
 }
 
@@ -63,6 +54,7 @@ Result Executor::loadModel() {
 }
 
 Result Executor::unloadModel() {
+    INFO_LOG("Executor[%d] unload model start", id_);
     assert(model_id_ != -1);
     return backend_->unloadModel(model_path_);
 }
@@ -113,6 +105,7 @@ Result Executor::prepareOutput() {
 
 // 同步接口
 std::vector<Tensor> Executor::run(std::vector<Tensor>&& inputs) {
+    INFO_LOG("Executor[%d] Run", id_);
     return backend_->infer(stream_.get(), model_id_, std::move(inputs));
 }
 

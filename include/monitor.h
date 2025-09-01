@@ -12,7 +12,7 @@ class BackendFactory {
                 int cnt;
                 lynGetDeviceCount(&cnt);
                 assert(cnt != 0);
-                int device_id = 0; // hard code
+                int device_id = 0; // 如支持同种类型的多个设备，这里需要改
                 auto backend = std::make_unique<Lynxi>(device_id);
                 auto res = backend->init();
                 if (res == FAIL) {
@@ -66,12 +66,16 @@ class Monitor {
       if (monitor_thread_.joinable()) {
         monitor_thread_.join();
       }
+      for (auto& [_, backend] : backends_) {
+        backend->finalize();
+      }
     }
 
     Monitor(const Monitor&) = delete;
     Monitor& operator=(const Monitor&) = delete;
 
     Result init();
+    // TODO: 每种类型可能有多个后端实例,改为vector<unique_ptr<Backend>>
     std::unordered_map<BackendType, std::unique_ptr<Backend>> backends_;
     std::unordered_map<BackendType, Prop> props_;
     std::thread monitor_thread_;
