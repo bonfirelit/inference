@@ -4,28 +4,52 @@ project(InferenceProject LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(LYNXI "Enable Lynxi backend" ON)
+option(ACL   "Enable Ascend ACL backend" OFF)
+
+message(STATUS "====================================")
+message(STATUS " Backend selection:")
+message(STATUS "   LYNXI backend: ${LYNXI}")
+message(STATUS "   ACL backend:   ${ACL}")
+message(STATUS "====================================")
+
 set(LIB_SRC
     src/framework/executor.cc
     src/framework/monitor.cc
     src/framework/session.cc
     src/util.cc
-    src/framework/backend/lynxi.cc
     src/framework/backend/dummy.cc
-    # src/framework/backend/ascend.cc
 )
+
+if(LYNXI)
+    list(APPEND LIB_SRC src/framework/backend/lynxi.cc)
+endif()
+
+if(ACL)
+    list(APPEND LIB_SRC src/framework/backend/ascend.cc)
+endif()
 
 add_library(inference SHARED ${LIB_SRC})
 
 target_link_directories(inference
     PUBLIC
         ${CMAKE_SOURCE_DIR}/3rd_party/opencv/lib
-        ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/lib
         ${CMAKE_SOURCE_DIR}/3rd_party/yaml/lib/arm
-        ${CMAKE_SOURCE_DIR}/3rd_party/acl/lib
 )
 
-if(EXISTS "/usr/local/lynxi/sdk/libs")
-    target_link_directories(inference PUBLIC /usr/local/lynxi/sdk/libs)
+if(LYNXI)
+    target_link_directories(inference PUBLIC
+        ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/lib
+    )
+    if(EXISTS "/usr/local/lynxi/sdk/libs")
+        target_link_directories(inference PUBLIC /usr/local/lynxi/sdk/libs)
+    endif()
+endif()
+
+if(ACL)
+    target_link_directories(inference PUBLIC
+        ${CMAKE_SOURCE_DIR}/3rd_party/acl/lib
+    )
 endif()
 
 target_link_libraries(inference
@@ -35,22 +59,43 @@ target_link_libraries(inference
         opencv_core
         opencv_imgproc
         opencv_imgcodecs
-        LYNCHIPSDKCLIENT
-        LYNSMICLIENTCOMM
-        # ascendcl
 )
+
+if(LYNXI)
+    target_link_libraries(inference
+        PUBLIC
+            LYNCHIPSDKCLIENT
+            LYNSMICLIENTCOMM
+    )
+endif()
+
+if(ACL)
+    target_link_libraries(inference
+        PUBLIC
+            ascendcl
+    )
+endif()
 
 target_include_directories(inference
     PUBLIC
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
-    ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
-    ${CMAKE_SOURCE_DIR}/3rd_party/acl/include
-    ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/3rd_party/opencv/include/opencv4
+        ${CMAKE_SOURCE_DIR}/3rd_party/yaml/include
 )
 
-if(EXISTS "/usr/local/lynxi/sdk/include")
-    target_include_directories(inference PUBLIC /usr/local/lynxi/sdk/include)
+if(LYNXI)
+    target_include_directories(inference PUBLIC
+        ${CMAKE_SOURCE_DIR}/3rd_party/lynxi/include
+    )
+    if(EXISTS "/usr/local/lynxi/sdk/include")
+        target_include_directories(inference PUBLIC /usr/local/lynxi/sdk/include)
+    endif()
+endif()
+
+if(ACL)
+    target_include_directories(inference PUBLIC
+        ${CMAKE_SOURCE_DIR}/3rd_party/acl/include
+    )
 endif()
 
 
