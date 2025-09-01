@@ -1,15 +1,21 @@
 #pragma once
 #include "common.h"
 #include "backend/backend.h"
+#ifdef ENABLE_LYNXI
 #include "backend/lynxi.h"
+#endif
+#ifdef ENABLE_ACL
 #include "backend/ascend.h"
+#endif
 #include "backend/dummy.h"
 
 class BackendFactory {
   public:
     static std::unique_ptr<Backend> createBackend(BackendType type) {
         switch (type) {
+#ifdef ENABLE_LYNXI
             case BACKEND_LYNXI: {
+                INFO_LOG("create lynxi backend now");
                 int cnt = 0;
                 lynGetDeviceCount(&cnt);
                 assert(cnt != 0);
@@ -21,18 +27,24 @@ class BackendFactory {
                 }
                 return backend;
             }
-            // case BACKEND_ACL: {
-            //     int device_id = 0;
-            //     auto backend = std::make_unique<Ascend>(device_id);
-            //     auto res = backend->init();
-            //     if (res == FAIL) {
-            //       return nullptr;
-            //     }
-            //     return backend;
-            // }
+#endif
+
+#ifdef ENABLE_ACL
+            case BACKEND_ACL: {
+                INFO_LOG("create ascend backend now");
+                int device_id = 0;
+                auto backend = std::make_unique<Ascend>(device_id);
+                auto res = backend->init();
+                if (res == FAIL) {
+                  return nullptr;
+                }
+                return backend;
+            }
+#endif
             case BACKEND_DUMMY:
                 return std::make_unique<Dummy>();
             default:
+                ERROR_LOG("create backend fail, check backend type!");
                 return nullptr;
         }
     }

@@ -39,6 +39,7 @@ float Monitor::getMemUsedRate(BackendType type) {
 }
 
 void Prop::update() {
+#ifdef ENABLE_LYNXI
     if (type == BACKEND_LYNXI) {
         lynDeviceProperties_t device_prop;
         auto err = lynGetDeviceProperties(dev_id, &device_prop);
@@ -52,4 +53,5 @@ void Prop::update() {
         temperature_current = device_prop.deviceTemperatureCurrent;
         temperature_limit = device_prop.deviceTemperatureLimit;
     }
+#endif
 }

@@ -9,6 +9,8 @@ Session::Session(const std::string& yaml_file) {
     for (auto d : scfg_.devices) {
         if (d == "lynxi") {
             backends_.push_back(monitor_->getBackend(BACKEND_LYNXI));
+        } else if (d == "ascend") {
+            backends_.push_back(monitor_->getBackend(BACKEND_ACL));
         } else if (d == "dummy") {
             backends_.push_back(monitor_->getBackend(BACKEND_DUMMY));
         } else {

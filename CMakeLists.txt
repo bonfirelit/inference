@@ -13,6 +13,14 @@ message(STATUS "   LYNXI backend: ${LYNXI}")
 message(STATUS "   ACL backend:   ${ACL}")
 message(STATUS "====================================")
 
+if(LYNXI)
+    add_definitions(-DENABLE_LYNXI)
+endif()
+
+if(ACL)
+    add_definitions(-DENABLE_ACL)
+endif()
+
 set(LIB_SRC
     src/framework/executor.cc
     src/framework/monitor.cc
@@ -50,6 +58,12 @@ if(ACL)
     target_link_directories(inference PUBLIC
         ${CMAKE_SOURCE_DIR}/3rd_party/acl/lib
     )
+    if(EXISTS "/usr/local/Ascend/ascend-toolkit/7.0.0/runtime/lib64")
+        target_link_directories(inference 
+                                PUBLIC 
+                                /usr/local/Ascend/ascend-toolkit/7.0.0/runtime/lib64
+        )
+    endif()
 endif()
 
 target_link_libraries(inference

@@ -29,7 +29,7 @@
     auto err__ = (expr);                                   \
     if (err__ != SUCCESS) {                                \
       std::cerr << "[ERROR] " << #expr << " failed: " << msg << std::endl; \
-      return err__;                                        \
+      return FAIL;                                        \
     }                                                      \
   } while (0)
 
