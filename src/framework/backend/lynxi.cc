@@ -23,6 +23,7 @@ Result Lynxi::init() {
 }
 
 Result Lynxi::finalize() {
+    lynSetCurrentContext(ctx_);
     INFO_LOG("lynxi backend finalize start");
     if (ctx_ == nullptr) {
         INFO_LOG("lynxi backend finalize: ctx_ is null, skip");
@@ -39,6 +40,7 @@ Result Lynxi::finalize() {
 }
 
 Result Lynxi::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) {
+    lynSetCurrentContext(ctx_);
     lynError_t err;
     if (dir == DEVICE2HOST) {
         err = lynMemcpy(dst, src, size, ServerToClient);
@@ -56,6 +58,7 @@ Result Lynxi::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir) 
 }
 
 Result Lynxi::malloc(void **dev_ptr, uint64_t size) {
+    lynSetCurrentContext(ctx_);
     lynError_t err = lynMalloc(dev_ptr, size);
     if (err != 0) {
         ERROR_LOG("lynxi malloc failed");
@@ -66,6 +69,7 @@ Result Lynxi::malloc(void **dev_ptr, uint64_t size) {
 }
 
 Result Lynxi::free(void *dev_ptr) {
+    lynSetCurrentContext(ctx_);
     lynError_t err = lynFree(dev_ptr);
     if (err != 0) {
         ERROR_LOG("lynxi free failed");
@@ -76,7 +80,7 @@ Result Lynxi::free(void *dev_ptr) {
 
 // 加载模型，同时创建modelinfo，返回model_id
 int Lynxi::loadModel(const std::string &path) {
-
+    lynSetCurrentContext(ctx_);
     // 判断模型是否已加载
     {
         std::lock_guard<std::mutex> lock(model_lock_);
@@ -161,6 +165,7 @@ int Lynxi::loadModel(const std::string &path) {
 }
 
 Result Lynxi::unloadModel(const std::string& path) {
+    lynSetCurrentContext(ctx_);
     lynModel_t model;
     {
         std::lock_guard<std::mutex> lock(model_lock_);
@@ -195,6 +200,7 @@ std::vector<Tensor> Lynxi::infer(Stream* stream, int model_id, std::vector<Tenso
     size_t batch_input_size, batch_output_size;
     std::vector<std::vector<uint32_t>> shapes;
     DataType output_type;
+    lynSetCurrentContext(ctx_);
 
     {
         std::lock_guard<std::mutex> lock(model_lock_);
@@ -299,15 +305,16 @@ std::unique_ptr<Stream> Lynxi::createStream() {
     auto err = lynSetCurrentContext(ctx_);
     if (err != 0) {
         ERROR_LOG("lynSetCurrentContext Fail");
-        return std::make_unique<LynxiStream>(this);
+        return std::make_unique<LynxiStream>(this, ctx_);
     }
     
-    std::unique_ptr<LynxiStream> stream = std::make_unique<LynxiStream>(this);
+    std::unique_ptr<LynxiStream> stream = std::make_unique<LynxiStream>(this, ctx_);
     stream->createStream();
     return stream;
 }
 
 Result Lynxi::destoryStream(Stream* stream) {
+    lynSetCurrentContext(ctx_);
     return stream->destoryStream();
 }
 
@@ -316,6 +323,7 @@ void* LynxiModel::getHandle() {
 }
 
 Result LynxiStream::synchronize() {
+    lynSetCurrentContext(ctx_);
     auto err = lynSynchronizeStream(stream_);
     if (err != 0) {
         ERROR_LOG("lynxi synchronize stream failed!");
@@ -325,6 +333,7 @@ Result LynxiStream::synchronize() {
 }
 
 Result LynxiStream::createStream() {
+    lynSetCurrentContext(ctx_);
     auto err = lynCreateStream(&stream_);
     if (err != 0) {
         ERROR_LOG("lynxi create stream failed!");
@@ -334,6 +343,7 @@ Result LynxiStream::createStream() {
 }
 
 Result LynxiStream::destoryStream() {
+    lynSetCurrentContext(ctx_);
     auto err = lynDestroyStream(stream_);
     if (err != 0) {
         ERROR_LOG("lynxi destory stream failed!");
@@ -344,6 +354,7 @@ Result LynxiStream::destoryStream() {
 }
 
 Result LynxiStream::recordEvent(Event* event) {
+    lynSetCurrentContext(ctx_);
     auto err = lynRecordEvent(stream_, (lynEvent_t)event->getEvent());
     if (err != 0) {
         ERROR_LOG("lynxi record event failed!");
@@ -353,6 +364,7 @@ Result LynxiStream::recordEvent(Event* event) {
 }
 
 Result LynxiStream::waitEvent(Event* event) {
+    lynSetCurrentContext(ctx_);
     auto err = lynStreamWaitEvent(stream_, (lynEvent_t)event->getEvent());
     if (err != 0) {
         ERROR_LOG("lynxi wait event failed!");

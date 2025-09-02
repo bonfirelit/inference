@@ -43,7 +43,7 @@ class LynxiModel : public Model {
 
 class LynxiStream : public Stream {
   public:
-    LynxiStream(Backend* backend) : Stream(backend) {}
+    LynxiStream(Backend* backend, lynContext_t ctx) : Stream(backend), ctx_(ctx) {}
     virtual ~LynxiStream() {}
     Result synchronize() override;
     Result createStream() override;
@@ -54,6 +54,7 @@ class LynxiStream : public Stream {
 
   private:
     lynStream_t stream_{nullptr};
+    lynContext_t ctx_{nullptr};
 };
 
 class LynxiEvent : public Event {

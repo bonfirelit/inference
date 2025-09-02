@@ -86,7 +86,7 @@ void Session::preRun() {
 
 SessionOut Session::Run() {
 
-    preprocess_thread_ = std::thread([this]() {
+    auto preprocess_thread = std::thread([this]() {
         this->preRun();
     });
 
@@ -115,7 +115,7 @@ SessionOut Session::Run() {
     for (auto& t : threads) {
         t.join();
     }
-    preprocess_thread_.join();
+    preprocess_thread.join();
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> total_duration = end_time - start_time;

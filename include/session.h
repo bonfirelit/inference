@@ -62,5 +62,4 @@ class Session {
     SessionCfg scfg_;
     PreprocessFn preprocess_fn_;
     PostprocessFn postprocess_fn_;
-    std::thread preprocess_thread_;
 };
