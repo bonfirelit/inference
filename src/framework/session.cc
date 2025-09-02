@@ -55,7 +55,7 @@ const std::string& image_path) {
 void Session::preRun(int start, int end) {
     std::vector<std::string>& input_files = scfg_.input_files;
 
-    for (int i = start; i <= end; i++) {
+    for (int i = start; i < end; i++) {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
             INFO_LOG("Session is preprocessing file[%d] now", i);
