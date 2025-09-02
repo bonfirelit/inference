@@ -46,7 +46,7 @@ class Session {
 
   private:
     SessionCfg loadConfig(const std::string& yaml_file);
-    void preRun();
+    void preRun(int, int);
 
     int num_executor_;
     int num_task_;

@@ -1,9 +1,9 @@
 model_path: "../../resnet/model/Net_0"
-num_executor: 1
-num_task: 1
+num_executor: 3
+num_task: 150
 devices: ["lynxi"]
 
-input_files: "../../resnet/data/lynx.jpg"
+input_files: "../../resnet/data/tank"
 
 inputs:
   - shape: [1, 3, 224, 224]

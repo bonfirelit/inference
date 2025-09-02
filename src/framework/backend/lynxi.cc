@@ -193,6 +193,8 @@ Result Lynxi::unloadModel(const std::string& path) {
 }
 
 std::vector<Tensor> Lynxi::infer(Stream* stream, int model_id, std::vector<Tensor>&& inputs) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
     lynStream_t lynstream = stream->getStream();
     lynModel_t model;
     size_t batch_size;
@@ -285,6 +287,10 @@ std::vector<Tensor> Lynxi::infer(Stream* stream, int model_id, std::vector<Tenso
     INFO_LOG("lynxi infer(): free device mem start");
     this->free(dev_input_ptr);
     this->free(dev_output_ptr);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end_time - start_time;
+    INFO_LOG("### Infer COST %f Second", duration.count());
 
     return outputs;
 }

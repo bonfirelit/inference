@@ -52,25 +52,24 @@ const std::string& image_path) {
 }
 */
 
-void Session::preRun() {
+void Session::preRun(int start, int end) {
     std::vector<std::string>& input_files = scfg_.input_files;
-    int n = input_files.size();
-    if (num_task_ != n) {
-        WARN_LOG("num task %d don't equal to input file num %d", num_task_, n);
-        num_task_ = std::min(num_task_, n);
-    }
-    task_counter_.store(num_task_);
 
-    for (int i = 0; i < num_task_; i++) {
+    for (int i = start; i <= end; i++) {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
             INFO_LOG("Session is preprocessing file[%d] now", i);
+            auto start_time = std::chrono::high_resolution_clock::now();
+
             tensor_bytes = preprocess_fn_(input_files[i]);
             assert(tensor_bytes.size() > 0);
-            INFO_LOG("Session preprocess[%d] down", i);
+
+            auto end_time = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> duration = end_time - start_time;
+            INFO_LOG("### Session preprocess file[%d] down, COST %f Second", i, duration.count());
         }
 
-        INFO_LOG("Session Create Task[%d] now", i);
+        // INFO_LOG("Session Create Task[%d] now", i);
         // TODO: 这里假设了模型只有一个输入张量
         std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
         auto in_dtype = scfg_.inputs[0].dtype;
@@ -85,15 +84,32 @@ void Session::preRun() {
                 }
             };
         tq_->push(task);
+        INFO_LOG("### Produced task[%d], queue size = %lu", i, tq_->size());
     }
 }
 
 
 SessionOut Session::Run() {
+    int n = scfg_.input_files.size();
+    if (num_task_ != n) {
+        WARN_LOG("num task %d don't equal to input file num %d", num_task_, n);
+        num_task_ = std::min(num_task_, n);
+    }
+    task_counter_.store(num_task_);
 
-    auto preprocess_thread = std::thread([this]() {
-        this->preRun();
-    });
+    int num_preprocess_thread = 4;
+    int chunk = (num_task_ + num_preprocess_thread - 1) / num_preprocess_thread;
+
+    std::vector<std::thread> pre_threads;
+    for (int t = 0; t < num_preprocess_thread; t++) {
+        int start = t * chunk;
+        int end   = std::min(start + chunk, num_task_);
+        if (start >= end) break; // 没有任务可分配
+
+        pre_threads.emplace_back([this, start, end]() {
+            this->preRun(start, end);
+        });
+    }
 
     std::vector<std::thread> threads;
     threads.reserve(num_executor_);
@@ -120,18 +136,20 @@ SessionOut Session::Run() {
     for (auto& t : threads) {
         t.join();
     }
-    preprocess_thread.join();
+    for (auto& t : pre_threads) {
+        t.join();
+    }
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> total_duration = end_time - start_time;
 
     // TODO:添加计算每个exeutor执行时间的代码
     // INFO_LOG("Session Run over, output size = %ld", outputs_[0].size());
-    INFO_LOG("Session使用%d个Executor, 耗时%f秒完成%d个任务的推理", num_executor_, total_duration.count(), num_task_);
+    INFO_LOG("### Session使用%d个Executor, 耗时%f秒完成%d个任务的推理", num_executor_, total_duration.count(), num_task_);
     // 返回结果
     
     SessionOut ret;
-    INFO_LOG("-----session get output size = %d", (int)outputs_.size());
+    // INFO_LOG("-----session get output size = %d", (int)outputs_.size());
     ret.reserve(outputs_.size());
 
     // Transform tensors to vector of bytes

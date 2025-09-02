@@ -14,10 +14,18 @@ Executor::~Executor() {
 
 Result Executor::Execute() {
     RETURN_IF_ERR(init(), "Executor init fail");
-    INFO_LOG("Executor[%d] loadModel", id_);
+    INFO_LOG("Executor [%d] load model start", id_);
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     RETURN_IF_ERR(loadModel(), "Exeuctor load model fail");
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end_time - start_time;
+    INFO_LOG("### Executor [%d] load model COST %f Second", id_, duration.count());
+
     Task task{};
     while (tq_->pop(task)) {
+        INFO_LOG("### Executor[%d] popped task, queue size = %lu", id_, tq_->size());
         // 执行
         task.cb(run(std::move(task.inputs)));
     }
