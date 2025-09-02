@@ -62,3 +62,42 @@ std::vector<int> top5Indices(const std::vector<float>& res) {
 
     return std::vector<int>(indices.begin(), indices.begin() + 5);
 }
+
+// helper: 如果 p 是文件 -> 返回 {p}
+//           如果 p 是目录 -> 返回 目录下所有普通文件（非递归）
+//           如果不存在 -> 返回空 vector，并打印 warning
+std::vector<std::string> filesFromPath(const std::string &p) {
+    std::vector<std::string> files;
+    std::error_code ec;
+    std::filesystem::path path(p);
+
+    if (!std::filesystem::exists(path, ec)) {
+        std::cerr << "[Warning] path does not exist: " << p << std::endl;
+        return files;
+    }
+
+    if (std::filesystem::is_regular_file(path, ec)) {
+        files.push_back(path.string());
+        return files;
+    }
+
+    if (std::filesystem::is_directory(path, ec)) {
+        for (const auto &entry : std::filesystem::directory_iterator(path, ec)) {
+            if (ec) {
+                std::cerr << "[Warning] error iterating dir " << p << ": " 
+                          << ec.message() << std::endl;
+                break;
+            }
+            // 只收集普通文件
+            if (entry.is_regular_file()) {
+                files.push_back(entry.path().string());
+            }
+        }
+        // 保证目录内部文件顺序稳定
+        std::sort(files.begin(), files.end());
+        return files;
+    }
+
+    std::cerr << "[Warning] path is neither file nor directory: " << p << std::endl;
+    return files;
+}

@@ -53,21 +53,27 @@ const std::string& image_path) {
 */
 
 void Session::preRun() {
+    std::vector<std::string>& input_files = scfg_.input_files;
+    int n = input_files.size();
+    if (num_task_ != n) {
+        WARN_LOG("num task %d don't equal to input file num %d", num_task_, n);
+        num_task_ = std::min(num_task_, n);
+    }
+    task_counter_.store(num_task_);
+
     for (int i = 0; i < num_task_; i++) {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
-            INFO_LOG("Session is preprocessing now");
-            tensor_bytes = preprocess_fn_(scfg_.input_file);
+            INFO_LOG("Session is preprocessing file[%d] now", i);
+            tensor_bytes = preprocess_fn_(input_files[i]);
             assert(tensor_bytes.size() > 0);
-            INFO_LOG("Session preprocess down");
+            INFO_LOG("Session preprocess[%d] down", i);
         }
 
         INFO_LOG("Session Create Task[%d] now", i);
         // TODO: 这里假设了模型只有一个输入张量
         std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
         auto in_dtype = scfg_.inputs[0].dtype;
-        INFO_LOG("The input shape is:");
-        printVector(in_shape);
 
         Task task{std::vector<Tensor>{{tensor_bytes, in_shape, stringToDataType(in_dtype)}}, 
                 [this](std::vector<Tensor>&& outputs) {
@@ -78,7 +84,6 @@ void Session::preRun() {
                     }
                 }
             };
-        task_counter_.fetch_add(1);
         tq_->push(task);
     }
 }
@@ -126,13 +131,13 @@ SessionOut Session::Run() {
     // 返回结果
     
     SessionOut ret;
+    INFO_LOG("-----session get output size = %d", (int)outputs_.size());
     ret.reserve(outputs_.size());
 
     // Transform tensors to vector of bytes
     for (auto result : outputs_) {
         // result是一个任务的所有输出张量
         std::vector<std::vector<uint8_t>> task_out;
-        INFO_LOG("### This model's output has %ld tensor ###", result.size());      
         task_out.reserve(result.size());
         for (auto tensor : result) {
             task_out.emplace_back(tensor.asVector());
@@ -143,6 +148,8 @@ SessionOut Session::Run() {
     // 后处理？
 }
 
+
+
 SessionCfg Session::loadConfig(const std::string& yaml_file) {
     YAML::Node config = YAML::LoadFile(yaml_file);
     SessionCfg sc;
@@ -150,7 +157,25 @@ SessionCfg Session::loadConfig(const std::string& yaml_file) {
     sc.model_path   = config["model_path"].as<std::string>();
     sc.num_executor = config["num_executor"].as<int>();
     sc.num_task     = config["num_task"].as<int>();
-    sc.input_file   = config["input_file"].as<std::string>();
+
+    if (config["input_files"]) {
+        YAML::Node in = config["input_files"];
+        if (in.IsSequence()) {
+            for (auto item : in) {
+                std::string p = item.as<std::string>();
+                auto files = filesFromPath(p);
+                sc.input_files.insert(sc.input_files.end(), files.begin(), files.end());
+            }
+        } else if (in.IsScalar()) {
+            std::string p = in.as<std::string>();
+            auto files = filesFromPath(p);
+            sc.input_files.insert(sc.input_files.end(), files.begin(), files.end());
+        } else {
+            std::cerr << "[Warning] input_files must be a string or a sequence of strings." << std::endl;
+        }
+    } else {
+        std::cerr << "[Warning] no input_files defined in " << yaml_file << std::endl;
+    }
 
     for (auto d : config["devices"]) {
         sc.devices.push_back(d.as<std::string>());

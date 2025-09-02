@@ -3,7 +3,7 @@ num_executor: 1
 num_task: 1
 devices: ["lynxi"]
 
-input_file: "../../yolov4/data/dog.jpg"
+input_files: "../../yolov4/data/dog.jpg"
 
 inputs:
   - shape: [1, 416, 416, 3]

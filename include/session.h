@@ -25,7 +25,7 @@ struct SessionCfg {
     std::string model_path;
     int num_executor;
     int num_task;
-    std::string input_file;
+    std::vector<std::string> input_files;
     std::vector<std::string> devices;
     std::vector<TensorCfg> inputs;
     std::vector<TensorCfg> outputs;
