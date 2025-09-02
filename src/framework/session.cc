@@ -4,6 +4,7 @@
 
 Session::Session(const std::string& yaml_file) {
     monitor_ = Monitor::getInstance();
+    assert(monitor_ != nullptr);
 
     scfg_ = loadConfig(yaml_file);
     for (auto d : scfg_.devices) {
@@ -51,10 +52,7 @@ const std::string& image_path) {
 }
 */
 
-
-SessionOut Session::Run() {
-    assert(monitor_ != nullptr);
-
+void Session::preRun() {
     for (int i = 0; i < num_task_; i++) {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
@@ -83,7 +81,14 @@ SessionOut Session::Run() {
         task_counter_.fetch_add(1);
         tq_->push(task);
     }
-    
+}
+
+
+SessionOut Session::Run() {
+
+    preprocess_thread_ = std::thread([this]() {
+        this->preRun();
+    });
 
     std::vector<std::thread> threads;
     threads.reserve(num_executor_);
@@ -110,6 +115,7 @@ SessionOut Session::Run() {
     for (auto& t : threads) {
         t.join();
     }
+    preprocess_thread_.join();
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> total_duration = end_time - start_time;

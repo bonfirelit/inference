@@ -60,6 +60,7 @@ Result Ascend::memcopy(void *dst, const void *src, uint64_t size, DIRECTION dir)
     return SUCCESS;
 }
 
+// TODO: 昇腾内存分配涉及RunMode
 Result Ascend::malloc(void **dev_ptr, uint64_t size) {
     aclError err = aclrtMalloc(dev_ptr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     if (err != ACL_SUCCESS) {
@@ -277,6 +278,7 @@ std::vector<Tensor> Ascend::infer(Stream* stream, int model_id, std::vector<Tens
         aclmdlAddDatasetBuffer(output, output_data);
     }
 
+    // Execute
     INFO_LOG("ascend infer(): model inference start");
     aclmdlExecuteAsync(model, input, output, aclstream);
     aclrtSynchronizeStream(aclstream);
