@@ -66,10 +66,20 @@ int main() {
     Session s2(yaml);
     s2.registerPreprocess(resnetPreprocess);
     auto outputs = s2.Run();
+    int batch = 5;
     for (int i = 0; i < outputs.size(); i++) {
         printf("task[%d]'s output:\n", i);
         for (auto task_out : outputs[i]) {
-            printVector(top5Indices(bytesToFloat32(task_out)));
+            std::vector<float> all_probs = bytesToFloat32(task_out);
+            int dim = all_probs.size() / batch; 
+            for (int b = 0; b < batch; b++) {
+                auto begin = all_probs.begin() + b * dim;
+                auto end   = begin + dim;
+                // std::vector<float> sample_probs(begin, end);
+
+                printf("  sample[%d]: ", b);
+                printVector(top5Indices(std::vector<float>(begin, end)));
+            }
         }
     }
     return 0;

@@ -52,50 +52,99 @@ const std::string& image_path) {
 }
 */
 
-void Session::preRun(int start, int end) {
+void Session::preRun(int start, int end, int batch_size) {
     std::vector<std::string>& input_files = scfg_.input_files;
+
+    std::vector<std::vector<uint8_t>> batch_samples;
+    batch_samples.reserve(batch_size);
 
     for (int i = start; i < end; i++) {
         std::vector<uint8_t> tensor_bytes;
         if (preprocess_fn_) {
             INFO_LOG("Session is preprocessing file[%d] now", i);
-            auto start_time = std::chrono::high_resolution_clock::now();
+            auto t0 = std::chrono::high_resolution_clock::now();
 
             tensor_bytes = preprocess_fn_(input_files[i]);
-            assert(tensor_bytes.size() > 0);
+            assert(!tensor_bytes.empty());
 
-            auto end_time = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> duration = end_time - start_time;
-            INFO_LOG("### Session preprocess file[%d] down, COST %f Second", i, duration.count());
+            auto t1 = std::chrono::high_resolution_clock::now();
+            INFO_LOG("### Session preprocess file[%d] done, COST %f Second",
+                     i, std::chrono::duration<double>(t1 - t0).count());
         }
 
-        // INFO_LOG("Session Create Task[%d] now", i);
-        // TODO: 这里假设了模型只有一个输入张量
-        std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
-        auto in_dtype = scfg_.inputs[0].dtype;
+        batch_samples.emplace_back(std::move(tensor_bytes));
 
-        Task task{std::vector<Tensor>{{tensor_bytes, in_shape, stringToDataType(in_dtype)}}, 
-                [this](std::vector<Tensor>&& outputs) {
-                    outputs_.emplace_back(std::move(outputs));
-                    // 每完成一个任务，计数器减一
-                    if (task_counter_.fetch_sub(1) == 1) {
-                        tq_->shutdown();  // 所有任务都处理完了
-                    }
-                }
-            };
-        tq_->push(task);
-        INFO_LOG("### Produced task[%d], queue size = %lu", i, tq_->size());
+        // 满一个batch就提交
+        if ((int)batch_samples.size() == batch_size) {
+            submitBatch(batch_samples, 0 /* no padding */);
+            batch_samples.clear();
+        }
     }
+
+    // 不足一个batch → padding
+    if (!batch_samples.empty()) {
+        int real_num = (int)batch_samples.size();
+        int padding_num = batch_size - real_num;
+
+        // 确定单个样本的大小（假设所有样本大小一致）
+        size_t sample_size = batch_samples[0].size();
+        std::vector<uint8_t> zero_sample(sample_size, 0);
+
+        for (int p = 0; p < padding_num; p++) {
+            batch_samples.emplace_back(zero_sample);
+        }
+
+        submitBatch(batch_samples, padding_num);
+    }
+}
+
+void Session::submitBatch(const std::vector<std::vector<uint8_t>>& batch_samples,
+                          int padding_num) {
+    // 拼接所有样本，形成一个大的连续 buffer
+    size_t sample_size = batch_samples[0].size();
+    size_t batch_size = batch_samples.size();
+    std::vector<uint8_t> batch_bytes;
+    batch_bytes.reserve(sample_size * batch_size);
+
+    for (auto& s : batch_samples) {
+        batch_bytes.insert(batch_bytes.end(), s.begin(), s.end());
+    }
+
+    // shape 需要改成 [batch_size, ...] (no don't need to do this)
+    std::vector<uint32_t> in_shape = scfg_.inputs[0].shape;
+    // in_shape.insert(in_shape.begin(), batch_size);
+
+    auto in_dtype = scfg_.inputs[0].dtype;
+
+    Task task{
+        std::vector<Tensor>{{std::move(batch_bytes), in_shape, stringToDataType(in_dtype)}},
+        [this, padding_num](std::vector<Tensor>&& outputs) {
+            outputs_.emplace_back(std::move(outputs));
+            if (padding_num > 0) {
+                INFO_LOG("### Task had %d padding samples", padding_num);
+            }
+            if (task_counter_.fetch_sub(1) == 1) {
+                tq_->shutdown();
+            }
+        }
+    };
+
+    tq_->push(task);
+    INFO_LOG("### Produced task, batch_size = %zu, queue size = %lu",
+             batch_size, tq_->size());
 }
 
 
 SessionOut Session::Run() {
     int n = scfg_.input_files.size();
+    int batch = scfg_.batch_size;
     if (num_task_ != n) {
         WARN_LOG("num task %d don't equal to input file num %d", num_task_, n);
         num_task_ = std::min(num_task_, n);
     }
-    task_counter_.store(num_task_);
+    // 因为是batch模式，任务量计算如下
+    int real_task_num = (num_task_ + batch - 1) / batch;
+    task_counter_.store(real_task_num);
 
     int num_preprocess_thread = 4;
     int chunk = (num_task_ + num_preprocess_thread - 1) / num_preprocess_thread;
@@ -107,7 +156,7 @@ SessionOut Session::Run() {
         if (start >= end) break; // 没有任务可分配
 
         pre_threads.emplace_back([this, start, end]() {
-            this->preRun(start, end);
+            this->preRun(start, end, scfg_.batch_size);
         });
     }
 
@@ -154,7 +203,7 @@ SessionOut Session::Run() {
 
     // Transform tensors to vector of bytes
     for (auto result : outputs_) {
-        // result是一个任务的所有输出张量
+        // result是模型的所有输出张量
         std::vector<std::vector<uint8_t>> task_out;
         task_out.reserve(result.size());
         for (auto tensor : result) {
@@ -175,6 +224,7 @@ SessionCfg Session::loadConfig(const std::string& yaml_file) {
     sc.model_path   = config["model_path"].as<std::string>();
     sc.num_executor = config["num_executor"].as<int>();
     sc.num_task     = config["num_task"].as<int>();
+    sc.batch_size   = config["batch_size"].as<int>();
 
     if (config["input_files"]) {
         YAML::Node in = config["input_files"];

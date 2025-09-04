@@ -25,6 +25,7 @@ struct SessionCfg {
     std::string model_path;
     int num_executor;
     int num_task;
+    int batch_size;
     std::vector<std::string> input_files;
     std::vector<std::string> devices;
     std::vector<TensorCfg> inputs;
@@ -46,7 +47,9 @@ class Session {
 
   private:
     SessionCfg loadConfig(const std::string& yaml_file);
-    void preRun(int, int);
+    void preRun(int, int, int);
+    void submitBatch(const std::vector<std::vector<uint8_t>>& batch_samples,
+                          int padding_num);
 
     int num_executor_;
     int num_task_;
