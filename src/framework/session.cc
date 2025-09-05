@@ -53,6 +53,8 @@ const std::string& image_path) {
 */
 
 void Session::preRun(int start, int end, int batch_size) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+
     std::vector<std::string>& input_files = scfg_.input_files;
 
     std::vector<std::vector<uint8_t>> batch_samples;
@@ -96,6 +98,9 @@ void Session::preRun(int start, int end, int batch_size) {
 
         submitBatch(batch_samples, padding_num);
     }
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+    INFO_LOG("@@@ THIS PRERUN COST %f Second", std::chrono::duration<double>(t1 - t0).count());
 }
 
 void Session::submitBatch(const std::vector<std::vector<uint8_t>>& batch_samples,
@@ -177,7 +182,7 @@ SessionOut Session::Run() {
             if (res != SUCCESS) {
                 ERROR_LOG("Executor [%d] failed", i);
             } else {
-                std::cout << "Executor [" << i << "] executed in " 
+                std::cout << "@@@ Executor [" << i << "] executed in " 
                       << duration.count() << " seconds." << std::endl;
             }
         });
