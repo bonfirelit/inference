@@ -69,6 +69,8 @@
         "typeindex": "cpp",
         "list": "cpp",
         "valarray": "cpp",
-        "any": "cpp"
+        "any": "cpp",
+        "*.tcc": "cpp",
+        "codecvt": "cpp"
     }
 }

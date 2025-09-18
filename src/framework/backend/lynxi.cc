@@ -1,8 +1,7 @@
 #include "backend/lynxi.h"
 
 Lynxi::Lynxi(int dev_id) : Backend(BACKEND_LYNXI, dev_id) {
-    // 不setDevice也能用
-    // lynSetDevice(dev_id);
+    lynSetDevice(dev_id);
 }
 
 Lynxi::~Lynxi() {}

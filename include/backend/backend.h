@@ -27,6 +27,8 @@ class Backend {
 
     virtual std::unique_ptr<Stream> createStream() = 0;
     virtual Result destoryStream(Stream* stream) = 0;
+    virtual std::unique_ptr<Event> createEvent() { return nullptr; }
+    virtual Result destoryEvent(Event* event) {return SUCCESS; }
 
     BackendType getBackendType() { return type_; }
 
